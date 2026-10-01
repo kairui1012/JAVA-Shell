@@ -12,6 +12,7 @@ public class Shell {
 
     @FunctionalInterface
     private interface CommandHandler {
+        // Returns true to continue the shell or false to exit.
         boolean execute(String arguments);
     }
 
@@ -43,9 +44,10 @@ public class Shell {
             String commandName = commandParts[0];
             String arguments = commandParts.length > 1 ? commandParts[1] : "";
 
+            // A handler returns true to continue the shell and false to exit.
             CommandHandler handler = commands.get(commandName);
             if (handler != null) {
-                if (handler.execute(arguments)) {
+                if (!handler.execute(arguments)) {
                     break;
                 }
                 continue;
@@ -82,12 +84,12 @@ public class Shell {
 
 
     private boolean exit() {
-        return true;
+        return false;
     }
 
     private boolean echo(String arguments) {
         System.out.println(arguments);
-        return false;
+        return true;
     }
 
     private boolean type(
@@ -118,22 +120,20 @@ public class Shell {
             }
         }
 
-        return false;
+        return true;
     }
 
     private boolean pwd(String currentDirectory) {
         System.out.println(currentDirectory);
-        return false;
+        return true;
     }
 
     private boolean cd(String arguments) {
 
-        boolean success = false;
         String input = arguments.trim();
 
         if (input.isEmpty()) {
             currentDirectory = System.getProperty("user.home");
-            success = true;
         }
         else if (input.equals("~") || input.startsWith("~/")) {
 
@@ -148,7 +148,6 @@ public class Shell {
             }
             else {
                 currentDirectory = path.toString();
-                success = true;
             }
         }
         else {
@@ -161,11 +160,10 @@ public class Shell {
             }
             else {
                 currentDirectory = path.toString();
-                success = true;
             }
         }
 
-        return success;
+        return true;
     }
 
 }
