@@ -1,5 +1,9 @@
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public class Main {
     public static void main(String[] args) throws Exception {
@@ -27,7 +31,28 @@ public class Main {
                     System.out.println(target+" is a shell builtin");
                 }
                 else {
-                    System.out.println(target+": not found");
+                    String path = System.getenv("PATH");
+                    String[] directories =
+                            path.split(Pattern.quote(File.pathSeparator));
+                    boolean found = false;
+                    for (String directory:directories){
+
+                        Path path_ = Path.of(directory, target);
+
+                        if (Files.exists(path_)){
+                            if (Files.isExecutable(path_)){
+                                System.out.println(target +" is " +directory+"/"+target);
+                                found = true;
+                            }
+                            else
+                            {
+                                continue;
+                            }
+                        }
+                    }
+                    if (!found){
+                        System.out.println(target+": not found");
+                    }
                 }
                 continue;
             }
