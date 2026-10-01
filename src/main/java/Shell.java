@@ -148,6 +148,7 @@ public class Shell {
 
             if (input.startsWith("~/")) {
                 path = path.resolve(input.substring(2)).normalize();
+                currentDirectory = path.toString();
             }
 
             if (!Files.isDirectory(path)) {
