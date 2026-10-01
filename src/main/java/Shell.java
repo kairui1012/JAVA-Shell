@@ -1,0 +1,171 @@
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Scanner;
+import java.util.regex.Pattern;
+
+public class Shell {
+
+    @FunctionalInterface
+    private interface CommandHandler {
+        boolean execute(String arguments);
+    }
+
+    String currentDirectory = System.getProperty("user.dir");
+
+    public void run() throws Exception {
+        String systemPath = System.getenv("PATH");
+        String[] directories = systemPath.split(
+                Pattern.quote(File.pathSeparator)
+        );
+
+
+
+        Scanner scanner = new Scanner(System.in);
+        HashMap<String, CommandHandler> commands = new HashMap<>();
+
+        commands.put("exit", arguments -> exit());
+        commands.put("echo", this::echo);
+        commands.put("type", arguments -> type(arguments, commands, directories));
+        commands.put("pwd", arguments -> pwd(currentDirectory));
+        commands.put("cd", this::cd);
+
+
+        while (true) {
+            System.out.print("$ ");
+
+            String command = scanner.nextLine();
+            String[] commandParts = command.split(" ", 2);
+            String commandName = commandParts[0];
+            String arguments = commandParts.length > 1 ? commandParts[1] : "";
+
+            CommandHandler handler = commands.get(commandName);
+            if (handler != null) {
+                if (handler.execute(arguments)) {
+                    break;
+                }
+                continue;
+            }
+
+            List<String> processCommand = new ArrayList<>();
+            String[] parts = command.trim().split("\\s+");
+
+            for (String directory : directories) {
+                Path candidate = Path.of(directory, commandName);
+
+                if (Files.isRegularFile(candidate)
+                        && Files.isExecutable(candidate)) {
+                    processCommand.add(commandName);
+                    processCommand.addAll(
+                            Arrays.asList(parts).subList(1, parts.length)
+                    );
+                    break;
+                }
+            }
+
+            if (processCommand.isEmpty()) {
+                System.out.println(commandName + ": command not found");
+            } else {
+                ProcessBuilder pb = new ProcessBuilder(processCommand);
+                pb.inheritIO();
+
+                try (Process process = pb.start()) {
+                    process.waitFor();
+                }
+            }
+        }
+    }
+
+
+    private boolean exit() {
+        return true;
+    }
+
+    private boolean echo(String arguments) {
+        System.out.println(arguments);
+        return false;
+    }
+
+    private boolean type(
+            String arguments,
+            HashMap<String, CommandHandler> commands,
+            String[] directories
+    ) {
+        String target = arguments.trim();
+
+        if (commands.containsKey(target)) {
+            System.out.println(target + " is a shell builtin");
+        } else {
+            boolean found = false;
+
+            for (String directory : directories) {
+                Path candidate = Path.of(directory, target);
+
+                if (Files.isRegularFile(candidate)
+                        && Files.isExecutable(candidate)) {
+                    System.out.println(target + " is " + candidate);
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                System.out.println(target + ": not found");
+            }
+        }
+
+        return false;
+    }
+
+    private boolean pwd(String currentDirectory) {
+        System.out.println(currentDirectory);
+        return false;
+    }
+
+    private boolean cd(String arguments) {
+
+        boolean success = false;
+        String input = arguments.trim();
+
+        if (input.isEmpty()) {
+            currentDirectory = System.getProperty("user.home");
+            success = true;
+        }
+        else if (input.equals("~") || input.startsWith("~/")) {
+
+            Path path = Path.of(System.getProperty("user.home"));
+
+            if (input.startsWith("~/")) {
+                path = path.resolve(input.substring(2)).normalize();
+            }
+
+            if (!Files.isDirectory(path)) {
+                System.out.println("cd: no such file or directory: " + arguments);
+            }
+            else {
+                currentDirectory = path.toString();
+                success = true;
+            }
+        }
+        else {
+            Path path = Path.of(currentDirectory)
+                    .resolve(input)
+                    .normalize();
+
+            if (!Files.isDirectory(path)) {
+                System.out.println("cd: no such file or directory: " + arguments);
+            }
+            else {
+                currentDirectory = path.toString();
+                success = true;
+            }
+        }
+
+        return success;
+    }
+
+}
