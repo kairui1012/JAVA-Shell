@@ -73,6 +73,11 @@ public class Main {
                 continue;
             }
 
+            if (command.equals("pwd")) {
+                System.out.println(System.getProperty("user.dir"));
+                continue;
+            }
+
             // Prepares the executable path and arguments for ProcessBuilder
             List<String> processCommand = new ArrayList<>();
 
