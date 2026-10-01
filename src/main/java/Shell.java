@@ -39,9 +39,16 @@ public class Shell {
         while (true) {
             System.out.print("$ ");
 
+            // Reads the full command entered by the user.
             String command = scanner.nextLine();
+
+            // Splits the input at the first space into a command name and its arguments.
             String[] commandParts = command.split(" ", 2);
+
+            // The first part identifies which command handler to execute.
             String commandName = commandParts[0];
+
+            // Uses the remaining text as arguments, or an empty string when none are provided.
             String arguments = commandParts.length > 1 ? commandParts[1] : "";
 
             // A handler returns true to continue the shell and false to exit.
