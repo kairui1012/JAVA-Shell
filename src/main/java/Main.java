@@ -85,15 +85,12 @@ public class Main {
                 Path candidate = Path.of(directory, commandName);
 
                 if (Files.isRegularFile(candidate) && Files.isExecutable(candidate)) {
-                    String executablePath = candidate.toString();
 
                     // Places the executable first, followed by its arguments
-                    processCommand.add(executablePath);
+                    processCommand.add(commandName);
                     processCommand.addAll(Arrays.asList(parts).subList(1, parts.length));
                     break;
                 }
-
-
             }
 
             // Prints the "<command>: command not found" message
