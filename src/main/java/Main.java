@@ -26,34 +26,48 @@ public class Main {
             }
 
             if (command.startsWith("type ")) {
-                String target = command.substring(5);
-                if (builtins.contains(target)){
-                    System.out.println(target+" is a shell builtin");
-                }
-                else {
-                    String path = System.getenv("PATH");
-                    String[] directories =
-                            path.split(Pattern.quote(File.pathSeparator));
+                // 取得 type 后面的命令名称，例如 "type echo" 得到 "echo"
+                String target = command.substring(5).trim();
+
+                // 先判断是不是 Shell 内建命令
+                if (builtins.contains(target)) {
+                    System.out.println(target + " is a shell builtin");
+                } else {
+                    // 获取系统 PATH，例如：
+                    // /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
+                    String systemPath = System.getenv("PATH");
+
+                    // 使用当前操作系统的 PATH 分隔符拆分目录
+                    String[] directories = systemPath.split(
+                            Pattern.quote(File.pathSeparator)
+                    );
+
                     boolean found = false;
-                    for (String directory:directories){
 
-                        Path path_ = Path.of(directory, target);
+                    // 按照 PATH 的顺序逐个寻找命令
+                    for (String directory : directories) {
+                        Path candidate = Path.of(directory, target);
 
-                        if (Files.exists(path_)){
-                            if (Files.isExecutable(path_)){
-                                System.out.println(target +" is " +directory+"/"+target);
-                                found = true;
-                            }
-                            else
-                            {
-                                continue;
-                            }
+                        // 必须是普通文件，并且当前用户拥有执行权限
+                        if (Files.isRegularFile(candidate)
+                                && Files.isExecutable(candidate)) {
+
+                            System.out.println(target + " is " + candidate);
+
+                            found = true;
+
+                            // Shell 只使用 PATH 中第一个匹配的可执行文件
+                            break;
                         }
                     }
-                    if (!found){
-                        System.out.println(target+": not found");
+
+                    // 搜索完全部 PATH 目录后仍未找到
+                    if (!found) {
+                        System.out.println(target + ": not found");
                     }
                 }
+
+                // type 命令处理完毕，进入 Shell 的下一轮循环
                 continue;
             }
 
