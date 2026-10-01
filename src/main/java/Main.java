@@ -10,8 +10,13 @@ public class Main {
             Scanner scanner = new Scanner(System.in);
             String command = scanner.nextLine();
 
+            if (command.equals("exit")) {
+                break;
+            }
+
             // Prints the "<command>: command not found" message
             System.out.println(command + ": command not found");
+
         }
     }
 }
