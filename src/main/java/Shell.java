@@ -148,15 +148,14 @@ public class Shell {
 
             if (input.startsWith("~/")) {
                 path = path.resolve(input.substring(2)).normalize();
-                currentDirectory = path.toString();
             }
 
             if (!Files.isDirectory(path)) {
                 System.out.println("cd: no such file or directory: " + arguments);
+                return false;
             }
-            else {
-                currentDirectory = path.toString();
-            }
+
+            currentDirectory = path.toString();
         }
         else {
             Path path = Path.of(currentDirectory)
