@@ -18,6 +18,7 @@ public class Shell {
 
     String currentDirectory = System.getProperty("user.dir");
 
+
     public void run() throws Exception {
         String systemPath = System.getenv("PATH");
         String[] directories = systemPath.split(
@@ -138,13 +139,19 @@ public class Shell {
     private boolean cd(String arguments) {
 
         String input = arguments.trim();
+        String homeDirectory = System.getenv("HOME");
+
+        if (homeDirectory == null || homeDirectory.isBlank()) {
+            homeDirectory = System.getProperty("user.home");
+        }
+
 
         if (input.isEmpty()) {
             currentDirectory = System.getProperty("user.home");
         }
         else if (input.equals("~") || input.startsWith("~/")) {
 
-            Path path = Path.of(System.getProperty("user.home"));
+            Path path = Path.of(homeDirectory);
 
             if (input.startsWith("~/")) {
                 path = path.resolve(input.substring(2)).normalize();
