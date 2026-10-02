@@ -1,8 +1,8 @@
 import java.io.File;
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Scanner;
@@ -13,13 +13,11 @@ public class Shell {
     @FunctionalInterface
     private interface CommandHandler {
         // Returns true to continue the shell or false to exit.
-        boolean execute(String arguments);
+        boolean execute(String arguments, PrintStream outputStream);
     }
 
-    String currentDirectory = System.getProperty("user.dir");
-
-
     public void run() throws Exception {
+        // Split PATH into directories used to locate external programs.
         String systemPath = System.getenv("PATH");
         String[] directories = systemPath.split(
                 Pattern.quote(File.pathSeparator)
@@ -27,13 +25,14 @@ public class Shell {
 
         Scanner scanner = new Scanner(System.in);
         HashMap<String, CommandHandler> commands = new HashMap<>();
+        Navigation navigation = new Navigation();
 
-        commands.put("exit", arguments -> exit());
+        // Register commands that are handled directly by this shell.
+        commands.put("exit", (arguments, outputStream) -> exit());
         commands.put("echo", this::echo);
-        commands.put("type", arguments -> type(arguments, commands, directories));
-        commands.put("pwd", arguments -> pwd(currentDirectory));
-        commands.put("cd", this::cd);
-
+        commands.put("type", (arguments, outputStream) -> type(arguments, commands, directories, outputStream));
+        commands.put("pwd", (arguments, outputStream) -> navigation.pwd(outputStream));
+        commands.put("cd", (arguments, outputStream) -> navigation.cd(arguments));
 
         while (true) {
             System.out.print("$ ");
@@ -41,7 +40,10 @@ public class Shell {
             // Reads the full command entered by the user.
             String command = scanner.nextLine();
 
-            List<String> parsedCommand = getStrings(command);
+            Redirection redirection = new Redirection();
+
+            // Split the input while preserving quoted arguments.
+            List<String> parsedCommand = Quoting.parse(command, redirection);
 
             if (parsedCommand.isEmpty()) {
                 continue;
@@ -58,15 +60,35 @@ public class Shell {
 
             List<String> processCommand = new ArrayList<>();
 
+
             // A handler returns true to continue the shell and false to exit.
             CommandHandler handler = commands.get(commandName);
+
+
             if (handler != null) {
-                if (!handler.execute(parsedArgumentLine)) {
-                    break;
+                PrintStream outputStream = System.out;
+
+                try {
+                    if (redirection.isRedirectionRequired()
+                            && redirection.hasOutputFile()) {
+                        outputStream = new PrintStream(
+                                redirection.getOutputFile()
+                        );
+                    }
+
+                    if (!handler.execute(parsedArgumentLine, outputStream)) {
+                        break;
+                    }
+                } finally {
+
+                    if (outputStream != System.out) {
+                        outputStream.close();
+                    }
                 }
+
                 continue;
             }
-
+            // Search each PATH directory for an executable with this name.
             for (String directory : directories) {
                 Path candidate = Path.of(directory, commandName);
 
@@ -82,7 +104,17 @@ public class Shell {
                 System.out.println(commandName + ": command not found");
             } else {
                 ProcessBuilder pb = new ProcessBuilder(processCommand);
+                // Connect the child process to this shell's input and output.
                 pb.inheritIO();
+
+                if (redirection.isRedirectionRequired()
+                        && redirection.hasOutputFile()) {
+                    pb.redirectOutput(
+                            ProcessBuilder.Redirect.to(
+                                    new File(redirection.getOutputFile())
+                            )
+                    );
+                }
 
                 try (Process process = pb.start()) {
                     process.waitFor();
@@ -91,95 +123,26 @@ public class Shell {
         }
     }
 
-    private List<String> getStrings(String arguments) {
-        List<String> result = new ArrayList<>();
-        boolean insideSingleQuote = false;
-        boolean insideDoubleQuote = false;
-        boolean escapeNextCharacter = false;
-        StringBuilder currentArgument = new StringBuilder();
-
-        for (int i = 0; i < arguments.length(); i++) {
-            char currentChar = arguments.charAt(i);
-
-            if (escapeNextCharacter) {
-                currentArgument.append(currentChar);
-                escapeNextCharacter = false;
-                continue;
-            }
-
-            if (currentChar == '\\') {
-
-                if (insideSingleQuote) {
-                    // 单引号内：反斜杠是普通字符
-                    currentArgument.append(currentChar);
-                    continue;
-                }
-                else if (insideDoubleQuote) {
-                    // 双引号内：检查下一个字符
-                    if (i + 1 < arguments.length()) {
-                        char nextCharacter = arguments.charAt(i + 1);
-                        if (nextCharacter == '\\'
-                                || nextCharacter == '"'
-                                || nextCharacter == '$'
-                                || nextCharacter == '`') {
-                            escapeNextCharacter = true;
-                            continue;
-                        }
-                    }
-                } else {
-                    // 所有引号外：保护任意下一个字符
-                    escapeNextCharacter = true;
-                    continue;
-                }
-            }
-
-            if (currentChar == '\'' && !insideDoubleQuote) {
-                insideSingleQuote = !insideSingleQuote;
-                continue;
-            }
-
-            if (currentChar == '"' && !insideSingleQuote) {
-                insideDoubleQuote = !insideDoubleQuote;
-                continue;
-            }
-
-            if (currentChar == ' ' && !insideSingleQuote  && !insideDoubleQuote) {
-                if (!currentArgument.isEmpty()) {
-                    result.add(currentArgument.toString());
-                    currentArgument.setLength(0);
-                }
-                continue;
-            }
-
-            currentArgument.append(currentChar);
-
-        }
-
-        if (!currentArgument.isEmpty()) {
-            result.add(currentArgument.toString());
-        }
-        return result;
-    }
-
-
     private boolean exit() {
         return false;
     }
 
-    private boolean echo(String arguments) {
-        System.out.println(arguments);
+    private boolean echo(String arguments, PrintStream outputStream) {
+        outputStream.println(arguments);
         return true;
     }
 
     private boolean type(
             String arguments,
             HashMap<String, CommandHandler> commands,
-            String[] directories
+            String[] directories,
+            PrintStream outputStream
     ) {
         String target = arguments.trim();
 
+        // A command can either be a shell built-in or an external executable.
         if (commands.containsKey(target)) {
-            System.out.println(target + " is a shell builtin");
+            outputStream.println(target + " is a shell builtin");
         } else {
             boolean found = false;
 
@@ -188,63 +151,14 @@ public class Shell {
 
                 if (Files.isRegularFile(candidate)
                         && Files.isExecutable(candidate)) {
-                    System.out.println(target + " is " + candidate);
+                    outputStream.println(target + " is " + candidate);
                     found = true;
                     break;
                 }
             }
 
             if (!found) {
-                System.out.println(target + ": not found");
-            }
-        }
-
-        return true;
-    }
-
-    private boolean pwd(String currentDirectory) {
-        System.out.println(currentDirectory);
-        return true;
-    }
-
-    private boolean cd(String arguments) {
-
-        String input = arguments.trim();
-        String homeDirectory = System.getenv("HOME");
-
-        if (homeDirectory == null || homeDirectory.isBlank()) {
-            homeDirectory = System.getProperty("user.home");
-        }
-
-
-        if (input.isEmpty()) {
-            currentDirectory = System.getProperty("user.home");
-        }
-        else if (input.equals("~") || input.startsWith("~/")) {
-
-            Path path = Path.of(homeDirectory);
-
-            if (input.startsWith("~/")) {
-                path = path.resolve(input.substring(2)).normalize();
-            }
-
-            if (!Files.isDirectory(path)) {
-                System.out.println("cd: no such file or directory: " + arguments);
-                return false;
-            }
-
-            currentDirectory = path.toString();
-        }
-        else {
-            Path path = Path.of(currentDirectory)
-                    .resolve(input)
-                    .normalize();
-
-            if (!Files.isDirectory(path)) {
-                System.out.println("cd: no such file or directory: " + arguments);
-            }
-            else {
-                currentDirectory = path.toString();
+                outputStream.println(target + ": not found");
             }
         }
 
