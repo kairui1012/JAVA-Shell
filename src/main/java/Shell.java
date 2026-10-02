@@ -52,6 +52,9 @@ public class Shell {
             // Uses the remaining text as arguments, or an empty string when none are provided.
             String arguments = commandParts.length > 1 ? commandParts[1] : "";
 
+            List<String> processCommand = new ArrayList<>();
+            List<String> parsedArguments = getStrings(arguments);
+
             // A handler returns true to continue the shell and false to exit.
             CommandHandler handler = commands.get(commandName);
             if (handler != null) {
@@ -60,36 +63,6 @@ public class Shell {
                 }
                 continue;
             }
-
-
-            List<String> processCommand = new ArrayList<>();
-            List<String> parsedArguments = new ArrayList<>();
-            boolean insideSingleQuote = false;
-            StringBuilder currentArgument = new StringBuilder();
-
-            for (int i = 0; i < arguments.length(); i++) {
-                char currentChar = arguments.charAt(i);
-
-                if (currentChar == '\'') {
-                    insideSingleQuote = !insideSingleQuote;
-                    continue;
-                }
-
-                if (currentChar == ' ' && !insideSingleQuote) {
-                    if (!currentArgument.isEmpty()) {
-                        parsedArguments.add(currentArgument.toString());
-                        currentArgument.setLength(0);
-                    }
-                    continue;
-                }
-
-                currentArgument.append(currentChar);
-            }
-
-            if (!currentArgument.isEmpty()) {
-                parsedArguments.add(currentArgument.toString());
-            }
-
 
             for (String directory : directories) {
                 Path candidate = Path.of(directory, commandName);
@@ -113,6 +86,36 @@ public class Shell {
                 }
             }
         }
+    }
+
+    private List<String> getStrings(String arguments) {
+        List<String> parsedArguments = new ArrayList<>();
+        boolean insideSingleQuote = false;
+        StringBuilder currentArgument = new StringBuilder();
+
+        for (int i = 0; i < arguments.length(); i++) {
+            char currentChar = arguments.charAt(i);
+
+            if (currentChar == '\'') {
+                insideSingleQuote = !insideSingleQuote;
+                continue;
+            }
+
+            if (currentChar == ' ' && !insideSingleQuote) {
+                if (!currentArgument.isEmpty()) {
+                    parsedArguments.add(currentArgument.toString());
+                    currentArgument.setLength(0);
+                }
+                continue;
+            }
+
+            currentArgument.append(currentChar);
+        }
+
+        if (!currentArgument.isEmpty()) {
+            parsedArguments.add(currentArgument.toString());
+        }
+        return parsedArguments;
     }
 
 
