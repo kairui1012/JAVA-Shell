@@ -25,8 +25,6 @@ public class Shell {
                 Pattern.quote(File.pathSeparator)
         );
 
-
-
         Scanner scanner = new Scanner(System.in);
         HashMap<String, CommandHandler> commands = new HashMap<>();
 
@@ -43,18 +41,22 @@ public class Shell {
             // Reads the full command entered by the user.
             String command = scanner.nextLine();
 
-            // Splits the input at the first space into a command name and its arguments.
-            String[] commandParts = command.split(" ", 2);
+            List<String> parsedCommand = getStrings(command);
 
-            // The first part identifies which command handler to execute.
-            String commandName = commandParts[0];
+            if (parsedCommand.isEmpty()) {
+                continue;
+            }
 
-            // Uses the remaining text as arguments, or an empty string when none are provided.
-            String arguments = commandParts.length > 1 ? commandParts[1] : "";
+            String commandName = parsedCommand.getFirst();
+
+            List<String> parsedArguments = parsedCommand.subList(
+                    1,
+                    parsedCommand.size()
+            );
+
+            String parsedArgumentLine = String.join(" ", parsedArguments);
 
             List<String> processCommand = new ArrayList<>();
-            List<String> parsedArguments = getStrings(arguments);
-            String parsedArgumentLine = String.join(" ", parsedArguments);
 
             // A handler returns true to continue the shell and false to exit.
             CommandHandler handler = commands.get(commandName);
@@ -93,10 +95,24 @@ public class Shell {
         List<String> result = new ArrayList<>();
         boolean insideSingleQuote = false;
         boolean insideDoubleQuote = false;
+        boolean escapeNextCharacter = false;
         StringBuilder currentArgument = new StringBuilder();
 
         for (int i = 0; i < arguments.length(); i++) {
             char currentChar = arguments.charAt(i);
+
+            if (escapeNextCharacter) {
+                currentArgument.append(currentChar);
+                escapeNextCharacter = false;
+                continue;
+            }
+
+            if (currentChar == '\\'
+                    && !insideSingleQuote
+                    && !insideDoubleQuote) {
+                escapeNextCharacter = true;
+                continue;
+            }
 
             if (currentChar == '\'' && !insideDoubleQuote) {
                 insideSingleQuote = !insideSingleQuote;
@@ -116,8 +132,8 @@ public class Shell {
                 continue;
             }
 
-
             currentArgument.append(currentChar);
+
         }
 
         if (!currentArgument.isEmpty()) {
