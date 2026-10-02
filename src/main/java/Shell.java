@@ -61,8 +61,35 @@ public class Shell {
                 continue;
             }
 
+
             List<String> processCommand = new ArrayList<>();
-            String[] parts = command.trim().split("\\s+");
+            List<String> parsedArguments = new ArrayList<>();
+            boolean insideSingleQuote = false;
+            StringBuilder currentArgument = new StringBuilder();
+
+            for (int i = 0; i < arguments.length(); i++) {
+                char currentChar = arguments.charAt(i);
+
+                if (currentChar == '\'') {
+                    insideSingleQuote = !insideSingleQuote;
+                    continue;
+                }
+
+                if (currentChar == ' ' && !insideSingleQuote) {
+                    if (!currentArgument.isEmpty()) {
+                        parsedArguments.add(currentArgument.toString());
+                        currentArgument.setLength(0);
+                    }
+                    continue;
+                }
+
+                currentArgument.append(currentChar);
+            }
+
+            if (!currentArgument.isEmpty()) {
+                parsedArguments.add(currentArgument.toString());
+            }
+
 
             for (String directory : directories) {
                 Path candidate = Path.of(directory, commandName);
@@ -70,9 +97,7 @@ public class Shell {
                 if (Files.isRegularFile(candidate)
                         && Files.isExecutable(candidate)) {
                     processCommand.add(commandName);
-                    processCommand.addAll(
-                            Arrays.asList(parts).subList(1, parts.length)
-                    );
+                    processCommand.addAll(parsedArguments);
                     break;
                 }
             }
