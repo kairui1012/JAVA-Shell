@@ -107,7 +107,9 @@ public class Shell {
                 continue;
             }
 
-            if (currentChar == '\\') {
+            if (currentChar == '\\'
+                    && !insideSingleQuote
+                    && !insideDoubleQuote) {
                 escapeNextCharacter = true;
                 continue;
             }
