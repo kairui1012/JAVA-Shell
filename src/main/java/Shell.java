@@ -54,11 +54,12 @@ public class Shell {
 
             List<String> processCommand = new ArrayList<>();
             List<String> parsedArguments = getStrings(arguments);
+            String parsedArgumentLine = String.join(" ", parsedArguments);
 
             // A handler returns true to continue the shell and false to exit.
             CommandHandler handler = commands.get(commandName);
             if (handler != null) {
-                if (!handler.execute(arguments)) {
+                if (!handler.execute(parsedArgumentLine)) {
                     break;
                 }
                 continue;
