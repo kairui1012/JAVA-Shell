@@ -90,33 +90,40 @@ public class Shell {
     }
 
     private List<String> getStrings(String arguments) {
-        List<String> parsedArguments = new ArrayList<>();
+        List<String> result = new ArrayList<>();
         boolean insideSingleQuote = false;
+        boolean insideDoubleQuote = false;
         StringBuilder currentArgument = new StringBuilder();
 
         for (int i = 0; i < arguments.length(); i++) {
             char currentChar = arguments.charAt(i);
 
-            if (currentChar == '\'') {
+            if (currentChar == '\'' && !insideDoubleQuote) {
                 insideSingleQuote = !insideSingleQuote;
                 continue;
             }
 
-            if (currentChar == ' ' && !insideSingleQuote) {
+            if (currentChar == '"' && !insideSingleQuote) {
+                insideDoubleQuote = !insideDoubleQuote;
+                continue;
+            }
+
+            if (currentChar == ' ' && !insideSingleQuote  && !insideDoubleQuote) {
                 if (!currentArgument.isEmpty()) {
-                    parsedArguments.add(currentArgument.toString());
+                    result.add(currentArgument.toString());
                     currentArgument.setLength(0);
                 }
                 continue;
             }
 
+
             currentArgument.append(currentChar);
         }
 
         if (!currentArgument.isEmpty()) {
-            parsedArguments.add(currentArgument.toString());
+            result.add(currentArgument.toString());
         }
-        return parsedArguments;
+        return result;
     }
 
 
