@@ -107,11 +107,30 @@ public class Shell {
                 continue;
             }
 
-            if (currentChar == '\\'
-                    && !insideSingleQuote
-                    && !insideDoubleQuote) {
-                escapeNextCharacter = true;
-                continue;
+            if (currentChar == '\\') {
+
+                if (insideSingleQuote) {
+                    // 单引号内：反斜杠是普通字符
+                    currentArgument.append(currentChar);
+                    continue;
+                }
+                else if (insideDoubleQuote) {
+                    // 双引号内：检查下一个字符
+                    if (i + 1 < arguments.length()) {
+                        char nextCharacter = arguments.charAt(i + 1);
+                        if (nextCharacter == '\\'
+                                || nextCharacter == '"'
+                                || nextCharacter == '$'
+                                || nextCharacter == '`') {
+                            escapeNextCharacter = true;
+                            continue;
+                        }
+                    }
+                } else {
+                    // 所有引号外：保护任意下一个字符
+                    escapeNextCharacter = true;
+                    continue;
+                }
             }
 
             if (currentChar == '\'' && !insideDoubleQuote) {
