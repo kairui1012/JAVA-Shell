@@ -1,4 +1,5 @@
 import org.jline.reader.*;
+import org.jline.reader.impl.DefaultParser;
 import org.jline.reader.impl.LineReaderImpl;
 import org.jline.reader.impl.completer.StringsCompleter;
 import org.jline.terminal.Terminal;
@@ -40,7 +41,9 @@ public class Shell {
         // Reads the full command entered by the user.
         Iterable<String> strings = List.of("exit","echo");
         StringsCompleter stringsCompleter = new StringsCompleter(strings);
-        LineReaderBuilder lineReaderBuilder = LineReaderBuilder.builder().completer(stringsCompleter);
+        DefaultParser parser = new DefaultParser();
+        parser.setEscapeChars(null);
+        LineReaderBuilder lineReaderBuilder = LineReaderBuilder.builder().parser(parser).completer(stringsCompleter);
         Terminal terminal = TerminalBuilder.terminal();
         LineReader lineReader = lineReaderBuilder.terminal(terminal).build();
 
