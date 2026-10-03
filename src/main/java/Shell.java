@@ -37,12 +37,15 @@ public class Shell {
         commands.put("pwd", (arguments, outputStream, errorStream) -> navigation.pwd(outputStream));
         commands.put("cd", (arguments, outputStream, errorStream) -> navigation.cd(arguments));
 
+        // Start the completion list with all shell built-in command names.
         List<String> strings = new ArrayList<>(commands.keySet());
 
+        // Add executable filenames found in every directory listed in PATH.
         for (String directory : directories) {
             File dir = new File(directory);
             File[] files = dir.listFiles();
 
+            // Ignore PATH entries that cannot be read or are not directories.
             if (files == null) {
                 continue;
             }
@@ -66,23 +69,27 @@ public class Shell {
         Terminal terminal = TerminalBuilder.terminal();
         LineReader lineReader = lineReaderBuilder.terminal(terminal).build();
 
+        // Store the consecutive TAB count in an array so it can be updated inside the widget lambda.
         int[] tabCount = {0};
 
+        // Access JLine's widgets and key maps to register custom TAB behavior.
         Map<String, Widget> widgets = lineReader.getWidgets();
         Map<String, KeyMap<Binding>> keyMaps = lineReader.getKeyMaps();
 
         widgets.put("my-tab", () -> {
+            // Use the text currently entered by the user as the completion prefix.
             String currentInput = lineReader.getBuffer().toString();
 
             List<String> matches = new ArrayList<>();
 
+            // Collect every built-in or executable whose name starts with the current input.
             for (String executable : strings) {
                 if (executable.startsWith(currentInput)) {
                     matches.add(executable);
                 }
             }
 
-            // No match
+            // No match: ring the terminal bell and restart the TAB sequence.
             if (matches.isEmpty()) {
                 terminal.writer().print("\u0007");
                 terminal.writer().flush();
@@ -91,26 +98,28 @@ public class Shell {
                 return true;
             }
 
-            // Only one match -> autocomplete directly
+            // One match: replace the input with the completed command and append a space.
             if (matches.size() == 1) {
                 String match = matches.getFirst();
 
                 lineReader.getBuffer().clear();
                 lineReader.getBuffer().write(match + " ");
 
+                lineReader.callWidget(LineReader.REDRAW_LINE);
+                lineReader.callWidget(LineReader.REDISPLAY);
+
                 tabCount[0] = 0;
                 return true;
             }
 
-            // Multiple matches
+            // Multiple matches: the first TAB rings the bell as a prompt.
             if (tabCount[0] == 0) {
-                // First TAB -> bell
                 terminal.writer().print("\u0007");
                 terminal.writer().flush();
 
                 tabCount[0] = 1;
             } else {
-                // Second TAB -> print all matches
+                // The second consecutive TAB prints all matches in alphabetical order.
                 matches.sort(String::compareTo);
 
                 String combineMatchesResult = String.join("  ", matches);
@@ -119,6 +128,7 @@ public class Shell {
                 terminal.writer().println(combineMatchesResult);
                 terminal.writer().flush();
 
+                // Restore the prompt and the user's current input after printing the matches.
                 lineReader.callWidget(LineReader.REDRAW_LINE);
                 lineReader.callWidget(LineReader.REDISPLAY);
 
@@ -128,6 +138,7 @@ public class Shell {
             return true;
         });
 
+        // Bind the custom widget to the TAB key in JLine's main key map.
         KeyMap<Binding> mainKeyMap = keyMaps.get(LineReader.MAIN);
         Binding binding = new Reference("my-tab");
         mainKeyMap.bind(binding, "\t");
