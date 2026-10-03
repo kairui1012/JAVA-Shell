@@ -1,3 +1,5 @@
+import org.jline.keymap.BindingReader;
+import org.jline.keymap.KeyMap;
 import org.jline.reader.*;
 import org.jline.reader.impl.DefaultParser;
 import org.jline.reader.impl.completer.StringsCompleter;
@@ -36,15 +38,97 @@ public class Shell {
         commands.put("pwd", (arguments, outputStream, errorStream) -> navigation.pwd(outputStream));
         commands.put("cd", (arguments, outputStream, errorStream) -> navigation.cd(arguments));
 
-        // Reads the full command entered by the user.
+        List<String> strings = new ArrayList<>(commands.keySet());
 
+        for (String directory : directories) {
+            File dir = new File(directory);
+            File[] files = dir.listFiles();
 
-        StringsCompleter stringsCompleter = getStringsCompleter(commands, directories);
+            if (files == null) {
+                continue;
+            }
+
+            for (File file : files) {
+                if (file.isFile() && file.canExecute()) {
+                    strings.add(file.getName());
+                }
+            }
+        }
+
+        // Build tab-completion candidates from shell built-ins and executable files in PATH.
+        StringsCompleter stringsCompleter = new StringsCompleter(strings);
+
+        // Keep backslashes in the input so the shell can apply its own escaping rules later.
         DefaultParser parser = new DefaultParser();
         parser.setEscapeChars(null);
+
+        // Combine parsing and completion behavior, then attach the reader to the terminal.
         LineReaderBuilder lineReaderBuilder = LineReaderBuilder.builder().parser(parser).completer(stringsCompleter);
         Terminal terminal = TerminalBuilder.terminal();
         LineReader lineReader = lineReaderBuilder.terminal(terminal).build();
+
+        int[] tabCount = {0};
+
+        Map<String, Widget> widgets = lineReader.getWidgets();
+        Map<String, KeyMap<Binding>> keyMaps = lineReader.getKeyMaps();
+
+        widgets.put("my-tab", () -> {
+            String currentInput = lineReader.getBuffer().toString();
+
+            List<String> matches = new ArrayList<>();
+
+            for (String executable : strings) {
+                if (executable.startsWith(currentInput)) {
+                    matches.add(executable);
+                }
+            }
+
+            // No match
+            if (matches.isEmpty()) {
+                terminal.writer().print("\u0007");
+                terminal.writer().flush();
+
+                tabCount[0] = 0;
+                return true;
+            }
+
+            // Only one match -> autocomplete directly
+            if (matches.size() == 1) {
+                String match = matches.getFirst();
+
+                lineReader.getBuffer().clear();
+                lineReader.getBuffer().write(match + " ");
+
+                tabCount[0] = 0;
+                return true;
+            }
+
+            // Multiple matches
+            if (tabCount[0] == 0) {
+                // First TAB -> bell
+                terminal.writer().print("\u0007");
+                terminal.writer().flush();
+
+                tabCount[0] = 1;
+            } else {
+                // Second TAB -> print all matches
+                matches.sort(String::compareTo);
+
+                String combineMatchesResult = String.join("  ", matches);
+
+                lineReader.printAbove(combineMatchesResult);
+
+                tabCount[0] = 0;
+            }
+
+            return true;
+        });
+
+        KeyMap<Binding> mainKeyMap = keyMaps.get(LineReader.MAIN);
+        Binding binding = new Reference("my-tab");
+        mainKeyMap.bind(binding, "\t");
+
+
 //        lineReader.printAbove
 //
 //        ("""
@@ -140,27 +224,7 @@ public class Shell {
         }
     }
 
-    private static StringsCompleter getStringsCompleter(HashMap<String, CommandHandler> commands, String[] directories) {
 
-        List<String> strings = new ArrayList<>(commands.keySet());
-
-        for (String directory : directories) {
-            File dir = new File(directory);
-            File[] files = dir.listFiles();
-
-            if (files == null) {
-                continue;
-            }
-
-            for (File file : files) {
-                if (file.isFile() && file.canExecute()) {
-                    strings.add(file.getName());
-                }
-            }
-        }
-
-        return new StringsCompleter(strings);
-    }
 
     private boolean exit() {
         return false;
