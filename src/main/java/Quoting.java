@@ -13,7 +13,8 @@ public final class Quoting {
         boolean insideSingleQuote = false;
         boolean insideDoubleQuote = false;
         boolean escapeNextCharacter = false;
-        boolean readingOutputFile = false;
+        boolean readingRedirectFile = false;
+        boolean readingErrorFile = false;
 
         // 暂存当前正在读取的命令参数或输出文件名。
         StringBuilder currentArgument = new StringBuilder();
@@ -66,9 +67,12 @@ public final class Quoting {
             // 引号外的空格表示当前参数读取完毕。
             if (currentChar == ' ' && !insideSingleQuote && !insideDoubleQuote) {
                 if (!currentArgument.isEmpty()) {
-                    if (readingOutputFile) {
+                    if (readingErrorFile) {
+                        redirection.setErrorFile(currentArgument.toString());
+                        readingErrorFile = false;
+                    } else if (readingRedirectFile) {
                         redirection.setOutputFile(currentArgument.toString());
-                        readingOutputFile = false;
+                        readingRedirectFile = false;
                     } else {
                         result.add(currentArgument.toString());
                     }
@@ -78,20 +82,40 @@ public final class Quoting {
                 continue;
             }
 
-            // 引号外的 > 开始输出重定向；1> 中的 1 不属于命令参数。
+            // Detect the redirection operator '>'.
+            // It is only an operator outside quotes and while no file name is being read.
             if (currentChar == '>'
                     && !insideDoubleQuote
                     && !insideSingleQuote
-                    && !readingOutputFile) {
-                if (!currentArgument.isEmpty()) {
-                    String currentValue = currentArgument.toString();
-                    if (!currentValue.equals("1")) {
+                    && !readingRedirectFile
+                    && !readingErrorFile) {
+
+                // currentArgument contains the characters immediately before '>'.
+                // "sam > output.txt"  -> it is empty because "sam" was already saved.
+                // "sam 1> output.txt" -> it contains "1" for stdout.
+                // "sam 2> error.txt"  -> it contains "2" for stderr.
+                String currentValue = currentArgument.toString();
+
+                if (currentValue.equals("2")) {
+                    // "2>" redirects stderr. The "2" is a file descriptor,
+                    // so it must not be added to the command arguments.
+                    readingErrorFile = true;
+                    redirection.setErrorRedirectionRequired(true);
+                } else {
+                    // "1>" and plain ">" redirect stdout. Only a value other
+                    // than the stdout file descriptor is a normal argument.
+                    if (!currentValue.isEmpty() && !currentValue.equals("1")) {
                         result.add(currentValue);
                     }
-                    currentArgument.setLength(0);
+
+                    readingRedirectFile = true;
+                    redirection.setRedirectionRequired(true);
                 }
-                readingOutputFile = true;
-                redirection.setRedirectionRequired(true);
+
+                // Clear the argument buffer before reading the file name.
+                currentArgument.setLength(0);
+
+                // Skip the remaining parsing logic for the '>' character.
                 continue;
             }
 
@@ -101,7 +125,10 @@ public final class Quoting {
 
         // 输入结束后，保存最后一个尚未被空格提交的值。
         if (!currentArgument.isEmpty()) {
-            if (readingOutputFile) {
+            if (readingErrorFile) {
+                // Store the actual file name that followed "2>".
+                redirection.setErrorFile(currentArgument.toString());
+            } else if (readingRedirectFile) {
                 redirection.setOutputFile(currentArgument.toString());
             } else {
                 result.add(currentArgument.toString());

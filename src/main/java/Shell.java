@@ -13,7 +13,7 @@ public class Shell {
     @FunctionalInterface
     private interface CommandHandler {
         // Returns true to continue the shell or false to exit.
-        boolean execute(String arguments, PrintStream outputStream);
+        boolean execute(String arguments, PrintStream outputStream, PrintStream errorStream);
     }
 
     public void run() throws Exception {
@@ -28,11 +28,11 @@ public class Shell {
         Navigation navigation = new Navigation();
 
         // Register commands that are handled directly by this shell.
-        commands.put("exit", (arguments, outputStream) -> exit());
+        commands.put("exit", (arguments, outputStream, errorStream) -> exit());
         commands.put("echo", this::echo);
-        commands.put("type", (arguments, outputStream) -> type(arguments, commands, directories, outputStream));
-        commands.put("pwd", (arguments, outputStream) -> navigation.pwd(outputStream));
-        commands.put("cd", (arguments, outputStream) -> navigation.cd(arguments));
+        commands.put("type", (arguments, outputStream, errorStream) -> type(arguments, commands, directories, outputStream));
+        commands.put("pwd", (arguments, outputStream, errorStream) -> navigation.pwd(outputStream));
+        commands.put("cd", (arguments, outputStream, errorStream) -> navigation.cd(arguments));
 
         while (true) {
             System.out.print("$ ");
@@ -67,7 +67,7 @@ public class Shell {
 
             if (handler != null) {
                 PrintStream outputStream = System.out;
-
+                PrintStream errorStream = System.err;
                 try {
                     if (redirection.isRedirectionRequired()
                             && redirection.hasOutputFile()) {
@@ -76,13 +76,25 @@ public class Shell {
                         );
                     }
 
-                    if (!handler.execute(parsedArgumentLine, outputStream)) {
+                    if (redirection.isErrorRedirectionRequired()
+                            && redirection.hasErrorFile()) {
+                        errorStream = new PrintStream(
+                                redirection.getErrorFile()
+                        );
+                    }
+
+                    if (!handler.execute(parsedArgumentLine, outputStream, errorStream)) {
                         break;
                     }
+
                 } finally {
 
                     if (outputStream != System.out) {
                         outputStream.close();
+                    }
+
+                    if (errorStream != System.err) {
+                        errorStream.close();
                     }
                 }
 
@@ -116,6 +128,15 @@ public class Shell {
                     );
                 }
 
+                if (redirection.isErrorRedirectionRequired()
+                        && redirection.hasErrorFile()) {
+                    pb.redirectError(
+                            ProcessBuilder.Redirect.to(
+                                    new File(redirection.getErrorFile())
+                            )
+                    );
+                }
+
                 try (Process process = pb.start()) {
                     process.waitFor();
                 }
@@ -127,7 +148,7 @@ public class Shell {
         return false;
     }
 
-    private boolean echo(String arguments, PrintStream outputStream) {
+    private boolean echo(String arguments, PrintStream outputStream,PrintStream errorStream ) {
         outputStream.println(arguments);
         return true;
     }
