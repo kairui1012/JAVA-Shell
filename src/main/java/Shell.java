@@ -100,15 +100,8 @@ public class Shell {
 
             // One match: replace the input with the completed command and append a space.
             if (matches.size() == 1) {
-                String match = matches.getFirst();
-
-                lineReader.getBuffer().clear();
-                lineReader.getBuffer().write(match + " ");
-
-                lineReader.callWidget(LineReader.REDRAW_LINE);
-                lineReader.callWidget(LineReader.REDISPLAY);
-
                 tabCount[0] = 0;
+                lineReader.callWidget(LineReader.COMPLETE_WORD);
                 return true;
             }
 
