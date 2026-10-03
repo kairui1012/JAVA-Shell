@@ -1,3 +1,8 @@
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
+
 public final class Redirection {
 
     private String outputFile;
@@ -52,5 +57,69 @@ public final class Redirection {
 
     public boolean isAppend() {
         return append;
+    }
+
+    public void startOutputRedirection(boolean append) {
+        setAppend(append);
+        setRedirectionRequired(true);
+    }
+
+    public void startErrorRedirection(boolean append) {
+        setAppend(append);
+        setErrorRedirectionRequired(true);
+    }
+
+    public PrintStream openOutputStream(
+            PrintStream defaultOutputStream
+    ) throws FileNotFoundException {
+        if (isRedirectionRequired() && hasOutputFile()) {
+            return new PrintStream(
+                    new FileOutputStream(getOutputFile(), isAppend())
+            );
+        }
+
+        return defaultOutputStream;
+    }
+
+    public PrintStream openErrorStream(
+            PrintStream defaultErrorStream
+    ) throws FileNotFoundException {
+        if (isErrorRedirectionRequired() && hasErrorFile()) {
+            return new PrintStream(
+                    new FileOutputStream(getErrorFile(), isAppend())
+            );
+        }
+
+        return defaultErrorStream;
+    }
+
+    public void applyTo(ProcessBuilder processBuilder) {
+        if (isRedirectionRequired() && hasOutputFile()) {
+            File file = new File(getOutputFile());
+
+            if (isAppend()) {
+                processBuilder.redirectOutput(
+                        ProcessBuilder.Redirect.appendTo(file)
+                );
+            } else {
+                processBuilder.redirectOutput(
+                        ProcessBuilder.Redirect.to(file)
+                );
+            }
+        }
+
+        if (isErrorRedirectionRequired() && hasErrorFile()) {
+            File file = new File(getErrorFile());
+
+            if (isAppend()) {
+                processBuilder.redirectError(
+                        ProcessBuilder.Redirect.appendTo(file)
+                );
+            } else {
+                processBuilder.redirectError(
+                        ProcessBuilder.Redirect.to(file)
+                );
+            }
+        }
     }
 }

@@ -1,12 +1,14 @@
+import org.jline.reader.*;
+import org.jline.reader.impl.LineReaderImpl;
+import org.jline.reader.impl.completer.StringsCompleter;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
+
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 import java.util.regex.Pattern;
 
 public class Shell {
@@ -24,7 +26,7 @@ public class Shell {
                 Pattern.quote(File.pathSeparator)
         );
 
-        Scanner scanner = new Scanner(System.in);
+
         HashMap<String, CommandHandler> commands = new HashMap<>();
         Navigation navigation = new Navigation();
 
@@ -36,10 +38,14 @@ public class Shell {
         commands.put("cd", (arguments, outputStream, errorStream) -> navigation.cd(arguments));
 
         while (true) {
-            System.out.print("$ ");
 
             // Reads the full command entered by the user.
-            String command = scanner.nextLine();
+            Iterable<String> strings = List.of("exit","echo");
+            StringsCompleter stringsCompleter = new StringsCompleter(strings);
+            LineReaderBuilder lineReaderBuilder = LineReaderBuilder.builder().completer(stringsCompleter);
+            Terminal terminal = TerminalBuilder.terminal();
+            LineReader lineReader = lineReaderBuilder.terminal(terminal).build();
+            String command = lineReader.readLine("$ ");
 
             Redirection redirection = new Redirection();
 
@@ -49,6 +55,8 @@ public class Shell {
             if (parsedCommand.isEmpty()) {
                 continue;
             }
+
+
 
             String commandName = parsedCommand.getFirst();
 
@@ -69,21 +77,9 @@ public class Shell {
             if (handler != null) {
                 PrintStream outputStream = System.out;
                 PrintStream errorStream = System.err;
-                boolean append = redirection.isAppend();
                 try {
-                    if (redirection.isRedirectionRequired()
-                            && redirection.hasOutputFile()) {
-                        outputStream = new PrintStream(
-                                new FileOutputStream(redirection.getOutputFile(), append)
-                        );
-                    }
-
-                    if (redirection.isErrorRedirectionRequired()
-                            && redirection.hasErrorFile()) {
-                        errorStream = new PrintStream(
-                                new FileOutputStream(redirection.getErrorFile(), append)
-                        );
-                    }
+                    outputStream = redirection.openOutputStream(System.out);
+                    errorStream = redirection.openErrorStream(System.err);
 
                     if (!handler.execute(parsedArgumentLine, outputStream, errorStream)) {
                         break;
@@ -120,43 +116,10 @@ public class Shell {
                 ProcessBuilder pb = new ProcessBuilder(processCommand);
                 // Connect the child process to this shell's input and output.
                 pb.inheritIO();
-                Boolean append = redirection.isAppend();
+                redirection.applyTo(pb);
 
-                if (redirection.isRedirectionRequired()
-                        && redirection.hasOutputFile()) {
-
-                    File outputFile = new File(redirection.getOutputFile());
-
-                    if (redirection.isAppend()) {
-                        pb.redirectOutput(
-                                ProcessBuilder.Redirect.appendTo(outputFile)
-                        );
-                    } else {
-                        pb.redirectOutput(
-                                ProcessBuilder.Redirect.to(outputFile)
-                        );
-                    }
-                }
-
-                if (redirection.isErrorRedirectionRequired()
-                        && redirection.hasErrorFile()) {
-
-                    File errorFile = new File(redirection.getErrorFile());
-
-                    if (redirection.isAppend()) {
-                        pb.redirectError(
-                                ProcessBuilder.Redirect.appendTo(errorFile)
-                        );
-                    } else {
-                        pb.redirectError(
-                                ProcessBuilder.Redirect.to(errorFile)
-                        );
-                    }
-                }
-
-                try (Process process = pb.start()) {
-                    process.waitFor();
-                }
+                Process process = pb.start();
+                process.waitFor();
             }
         }
     }

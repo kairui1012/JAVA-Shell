@@ -100,8 +100,6 @@ public final class Quoting {
                 boolean append = i + 1 < arguments.length()
                         && arguments.charAt(i + 1) == '>';
 
-                redirection.setAppend(append);
-
                 if (append) {
                     i++; // skip second '>'
                 }
@@ -110,7 +108,7 @@ public final class Quoting {
                     // "2>" redirects stderr. The "2" is a file descriptor,
                     // so it must not be added to the command arguments.
                     readingErrorFile = true;
-                    redirection.setErrorRedirectionRequired(true);
+                    redirection.startErrorRedirection(append);
                 } else {
                     // "1>" and plain ">" redirect stdout. Only a value other
                     // than the stdout file descriptor is a normal argument.
@@ -119,7 +117,7 @@ public final class Quoting {
                     }
 
                     readingRedirectFile = true;
-                    redirection.setRedirectionRequired(true);
+                    redirection.startOutputRedirection(append);
                 }
 
                 // Clear the argument buffer before reading the file name.
@@ -132,10 +130,6 @@ public final class Quoting {
             currentArgument.append(currentChar);
 
         }
-
-
-
-
 
         // 输入结束后，保存最后一个尚未被空格提交的值。
         if (!currentArgument.isEmpty()) {
