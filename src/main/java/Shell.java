@@ -1,4 +1,3 @@
-import org.jline.keymap.BindingReader;
 import org.jline.keymap.KeyMap;
 import org.jline.reader.*;
 import org.jline.reader.impl.DefaultParser;
@@ -116,7 +115,12 @@ public class Shell {
 
                 String combineMatchesResult = String.join("  ", matches);
 
-                lineReader.printAbove(combineMatchesResult);
+                terminal.writer().println();
+                terminal.writer().println(combineMatchesResult);
+                terminal.writer().flush();
+
+                lineReader.callWidget(LineReader.REDRAW_LINE);
+                lineReader.callWidget(LineReader.REDISPLAY);
 
                 tabCount[0] = 0;
             }
@@ -129,20 +133,19 @@ public class Shell {
         mainKeyMap.bind(binding, "\t");
 
 
-//        lineReader.printAbove
-//
-//        ("""
-//           \s
-//            ╦╔═╗╦  ╦╔═╗  ╔═╗╦ ╦╔═╗╦  ╦
-//            ║╠═╣╚╗╔╝╠═╣  ╚═╗╠═╣║╣ ║  ║
-//           ╚╝╩ ╩ ╚╝ ╩ ╩  ╚═╝╩ ╩╚═╝╩═╝╩═╝
-//
-//           Java Shell
-//           Built from scratch by Sam
-//
-//           GitHub: github.com/kairui1012
-//          \s
-//       \s""");
+        //        lineReader.printAbove
+        //        ("""
+        //           \s
+        //            ╦╔═╗╦  ╦╔═╗  ╔═╗╦ ╦╔═╗╦  ╦
+        //            ║╠═╣╚╗╔╝╠═╣  ╚═╗╠═╣║╣ ║  ║
+        //           ╚╝╩ ╩ ╚╝ ╩ ╩  ╚═╝╩ ╩╚═╝╩═╝╩═╝
+        //
+        //           Java Shell
+        //           Built from scratch by Sam
+        //
+        //           GitHub: github.com/kairui1012
+        //          \s
+        //       \s""");
 
 
         while (true) {
