@@ -73,28 +73,16 @@ public class Shell {
                 try {
                     if (redirection.isRedirectionRequired()
                             && redirection.hasOutputFile()) {
-                        if (append) {
-                            outputStream = new PrintStream(
-                                    new FileOutputStream(redirection.getOutputFile(), true)
-                            );
-                        } else {
-                            outputStream = new PrintStream(
-                                    new FileOutputStream(redirection.getOutputFile(), false)
-                            );
-                        }
+                        outputStream = new PrintStream(
+                                new FileOutputStream(redirection.getOutputFile(), append)
+                        );
                     }
 
                     if (redirection.isErrorRedirectionRequired()
                             && redirection.hasErrorFile()) {
-                        if (append) {
-                            errorStream = new PrintStream(
-                                    new FileOutputStream(redirection.getErrorFile(), true)
-                            );
-                        } else {
-                            errorStream = new PrintStream(
-                                    new FileOutputStream(redirection.getErrorFile(), false)
-                            );
-                        }
+                        errorStream = new PrintStream(
+                                new FileOutputStream(redirection.getErrorFile(), append)
+                        );
                     }
 
                     if (!handler.execute(parsedArgumentLine, outputStream, errorStream)) {
@@ -132,23 +120,38 @@ public class Shell {
                 ProcessBuilder pb = new ProcessBuilder(processCommand);
                 // Connect the child process to this shell's input and output.
                 pb.inheritIO();
+                Boolean append = redirection.isAppend();
 
                 if (redirection.isRedirectionRequired()
                         && redirection.hasOutputFile()) {
-                    pb.redirectOutput(
-                            ProcessBuilder.Redirect.to(
-                                    new File(redirection.getOutputFile())
-                            )
-                    );
+
+                    File outputFile = new File(redirection.getOutputFile());
+
+                    if (redirection.isAppend()) {
+                        pb.redirectOutput(
+                                ProcessBuilder.Redirect.appendTo(outputFile)
+                        );
+                    } else {
+                        pb.redirectOutput(
+                                ProcessBuilder.Redirect.to(outputFile)
+                        );
+                    }
                 }
 
                 if (redirection.isErrorRedirectionRequired()
                         && redirection.hasErrorFile()) {
-                    pb.redirectError(
-                            ProcessBuilder.Redirect.to(
-                                    new File(redirection.getErrorFile())
-                            )
-                    );
+
+                    File errorFile = new File(redirection.getErrorFile());
+
+                    if (redirection.isAppend()) {
+                        pb.redirectError(
+                                ProcessBuilder.Redirect.appendTo(errorFile)
+                        );
+                    } else {
+                        pb.redirectError(
+                                ProcessBuilder.Redirect.to(errorFile)
+                        );
+                    }
                 }
 
                 try (Process process = pb.start()) {
