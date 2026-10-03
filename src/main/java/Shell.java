@@ -26,7 +26,6 @@ public class Shell {
                 Pattern.quote(File.pathSeparator)
         );
 
-
         HashMap<String, CommandHandler> commands = new HashMap<>();
         Navigation navigation = new Navigation();
 
@@ -38,13 +37,28 @@ public class Shell {
         commands.put("cd", (arguments, outputStream, errorStream) -> navigation.cd(arguments));
 
         // Reads the full command entered by the user.
-        Iterable<String> strings = List.of("exit","echo");
-        StringsCompleter stringsCompleter = new StringsCompleter(strings);
+
+
+        StringsCompleter stringsCompleter = getStringsCompleter(commands, directories);
         DefaultParser parser = new DefaultParser();
         parser.setEscapeChars(null);
         LineReaderBuilder lineReaderBuilder = LineReaderBuilder.builder().parser(parser).completer(stringsCompleter);
         Terminal terminal = TerminalBuilder.terminal();
         LineReader lineReader = lineReaderBuilder.terminal(terminal).build();
+//        lineReader.printAbove
+//
+//        ("""
+//           \s
+//            ╦╔═╗╦  ╦╔═╗  ╔═╗╦ ╦╔═╗╦  ╦
+//            ║╠═╣╚╗╔╝╠═╣  ╚═╗╠═╣║╣ ║  ║
+//           ╚╝╩ ╩ ╚╝ ╩ ╩  ╚═╝╩ ╩╚═╝╩═╝╩═╝
+//
+//           Java Shell
+//           Built from scratch by Sam
+//
+//           GitHub: github.com/kairui1012
+//          \s
+//       \s""");
 
 
         while (true) {
@@ -124,6 +138,28 @@ public class Shell {
                 process.waitFor();
             }
         }
+    }
+
+    private static StringsCompleter getStringsCompleter(HashMap<String, CommandHandler> commands, String[] directories) {
+
+        List<String> strings = new ArrayList<>(commands.keySet());
+
+        for (String directory : directories) {
+            File dir = new File(directory);
+            File[] files = dir.listFiles();
+
+            if (files == null) {
+                continue;
+            }
+
+            for (File file : files) {
+                if (file.isFile() && file.canExecute()) {
+                    strings.add(file.getName());
+                }
+            }
+        }
+
+        return new StringsCompleter(strings);
     }
 
     private boolean exit() {
