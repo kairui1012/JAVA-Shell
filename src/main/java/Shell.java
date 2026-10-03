@@ -38,7 +38,7 @@ public class Shell {
         commands.put("cd", (arguments, outputStream, errorStream) -> navigation.cd(arguments));
 
         // Start the completion list with all shell built-in command names.
-        List<String> strings = new ArrayList<>(commands.keySet());
+        Set<String> strings = new HashSet<>(commands.keySet());
 
         // Add executable filenames found in every directory listed in PATH.
         for (String directory : directories) {
