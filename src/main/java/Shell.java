@@ -37,17 +37,19 @@ public class Shell {
         commands.put("pwd", (arguments, outputStream, errorStream) -> navigation.pwd(outputStream));
         commands.put("cd", (arguments, outputStream, errorStream) -> navigation.cd(arguments));
 
+        // Reads the full command entered by the user.
+        Iterable<String> strings = List.of("exit","echo");
+        StringsCompleter stringsCompleter = new StringsCompleter(strings);
+        LineReaderBuilder lineReaderBuilder = LineReaderBuilder.builder().completer(stringsCompleter);
+        Terminal terminal = TerminalBuilder.terminal();
+        LineReader lineReader = lineReaderBuilder.terminal(terminal).build();
+
+
         while (true) {
 
-            // Reads the full command entered by the user.
-            Iterable<String> strings = List.of("exit","echo");
-            StringsCompleter stringsCompleter = new StringsCompleter(strings);
-            LineReaderBuilder lineReaderBuilder = LineReaderBuilder.builder().completer(stringsCompleter);
-            Terminal terminal = TerminalBuilder.terminal();
-            LineReader lineReader = lineReaderBuilder.terminal(terminal).build();
-            String command = lineReader.readLine("$ ");
-
             Redirection redirection = new Redirection();
+
+            String command = lineReader.readLine("$ ");
 
             // Split the input while preserving quoted arguments.
             List<String> parsedCommand = Quoting.parse(command, redirection);
@@ -55,8 +57,6 @@ public class Shell {
             if (parsedCommand.isEmpty()) {
                 continue;
             }
-
-
 
             String commandName = parsedCommand.getFirst();
 
