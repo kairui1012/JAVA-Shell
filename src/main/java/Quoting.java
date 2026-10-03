@@ -84,6 +84,7 @@ public final class Quoting {
 
             // Detect the redirection operator '>'.
             // It is only an operator outside quotes and while no file name is being read.
+
             if (currentChar == '>'
                     && !insideDoubleQuote
                     && !insideSingleQuote
@@ -95,6 +96,15 @@ public final class Quoting {
                 // "sam 1> output.txt" -> it contains "1" for stdout.
                 // "sam 2> error.txt"  -> it contains "2" for stderr.
                 String currentValue = currentArgument.toString();
+
+                boolean append = i + 1 < arguments.length()
+                        && arguments.charAt(i + 1) == '>';
+
+                redirection.setAppend(append);
+
+                if (append) {
+                    i++; // skip second '>'
+                }
 
                 if (currentValue.equals("2")) {
                     // "2>" redirects stderr. The "2" is a file descriptor,
@@ -122,6 +132,10 @@ public final class Quoting {
             currentArgument.append(currentChar);
 
         }
+
+
+
+
 
         // 输入结束后，保存最后一个尚未被空格提交的值。
         if (!currentArgument.isEmpty()) {

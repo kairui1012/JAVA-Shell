@@ -4,6 +4,7 @@ public final class Redirection {
     private boolean redirectionRequired = false;
     private String errorFile;
     private boolean errorRedirectionRequired = false;
+    private boolean append = false;
 
     public void setOutputFile(String outputFile) {
         this.outputFile = outputFile;
@@ -43,5 +44,13 @@ public final class Redirection {
 
     public boolean isErrorRedirectionRequired() {
         return errorRedirectionRequired;
+    }
+
+    public void setAppend(boolean append) {
+        this.append = append;
+    }
+
+    public boolean isAppend() {
+        return append;
     }
 }

@@ -1,4 +1,5 @@
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -68,19 +69,32 @@ public class Shell {
             if (handler != null) {
                 PrintStream outputStream = System.out;
                 PrintStream errorStream = System.err;
+                boolean append = redirection.isAppend();
                 try {
                     if (redirection.isRedirectionRequired()
                             && redirection.hasOutputFile()) {
-                        outputStream = new PrintStream(
-                                redirection.getOutputFile()
-                        );
+                        if (append) {
+                            outputStream = new PrintStream(
+                                    new FileOutputStream(redirection.getOutputFile(), true)
+                            );
+                        } else {
+                            outputStream = new PrintStream(
+                                    new FileOutputStream(redirection.getOutputFile(), false)
+                            );
+                        }
                     }
 
                     if (redirection.isErrorRedirectionRequired()
                             && redirection.hasErrorFile()) {
-                        errorStream = new PrintStream(
-                                redirection.getErrorFile()
-                        );
+                        if (append) {
+                            errorStream = new PrintStream(
+                                    new FileOutputStream(redirection.getErrorFile(), true)
+                            );
+                        } else {
+                            errorStream = new PrintStream(
+                                    new FileOutputStream(redirection.getErrorFile(), false)
+                            );
+                        }
                     }
 
                     if (!handler.execute(parsedArgumentLine, outputStream, errorStream)) {
