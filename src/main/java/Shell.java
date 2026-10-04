@@ -21,6 +21,7 @@ public class Shell {
     }
 
     public void run() throws Exception {
+
         // Split PATH into directories used to locate external programs.
         String systemPath = System.getenv("PATH");
         String[] directories = systemPath.split(
@@ -77,19 +78,74 @@ public class Shell {
         Map<String, KeyMap<Binding>> keyMaps = lineReader.getKeyMaps();
 
         widgets.put("my-tab", () -> {
-            // Use the text currently entered by the user as the completion prefix.
-            String currentInput = lineReader.getBuffer().toString();
 
+            String buffer = lineReader.getBuffer().toString();
             List<String> matches = new ArrayList<>();
 
-            // Collect every built-in or executable whose name starts with the current input.
-            for (String executable : strings) {
-                if (executable.startsWith(currentInput)) {
-                    matches.add(executable);
+            boolean isPathCompletion = buffer.contains(" ");
+
+            String commandPart = "";
+            String pathInput = "";
+
+            if (!isPathCompletion) {
+
+                // =====================
+                // Command completion
+                // =====================
+
+                for (String executable : strings) {
+                    if (executable.startsWith(buffer)) {
+                        matches.add(executable);
+                    }
+                }
+
+            } else {
+
+                // =====================
+                // File/path completion
+                // =====================
+
+                int lastSpace = buffer.lastIndexOf(' ');
+
+                commandPart = buffer.substring(0, lastSpace + 1);
+                pathInput = buffer.substring(lastSpace + 1);
+
+                int lastSlash = pathInput.lastIndexOf('/');
+
+                String parent;
+                String prefix;
+
+                if (lastSlash == -1) {
+                    parent = "";
+                    prefix = pathInput;
+                } else {
+                    parent = pathInput.substring(0, lastSlash + 1);
+                    prefix = pathInput.substring(lastSlash + 1);
+                }
+
+                File directory;
+
+                if (parent.isEmpty()) {
+                    directory = new File(".");
+                } else {
+                    directory = new File(parent);
+                }
+
+                File[] files = directory.listFiles();
+
+                if (files != null) {
+                    for (File file : files) {
+                        if (file.getName().startsWith(prefix)) {
+                            matches.add(parent + file.getName());
+                        }
+                    }
                 }
             }
 
-            // No match: ring the terminal bell and restart the TAB sequence.
+            // =====================
+            // No match
+            // =====================
+
             if (matches.isEmpty()) {
                 terminal.writer().print("\u0007");
                 terminal.writer().flush();
@@ -98,68 +154,114 @@ public class Shell {
                 return true;
             }
 
-            // One match: replace the input with the completed command and append a space.
+            // =====================
+            // One match
+            // =====================
+
             if (matches.size() == 1) {
-                tabCount[0] = 0;
-                lineReader.callWidget(LineReader.COMPLETE_WORD);
-                return true;
-            }
 
-            // Multiple matches: the first TAB rings the bell as a prompt.
+                String match = matches.getFirst();
 
-            // STEP 1:Calculate Longest Common Prefix
-            String lcp = matches.getFirst();
-
-            for (String match : matches) {
-                int i = 0;
-                while (
-                        i < lcp.length()
-                        && i < match.length()
-                        && lcp.charAt(i) == match.charAt(i)) {
-                    i++;
-                }
-                lcp = lcp.substring(0, i);
-            }
-
-            // STEP 2:
-
-            if (lcp.length() > currentInput.length()) {
-                // clear buffer
                 lineReader.getBuffer().clear();
 
-                // write lcp
-                lineReader.getBuffer().write(lcp);
+                if (isPathCompletion) {
+                    File matchedFile = new File(match);
 
-                // redraw
+                    if (matchedFile.isDirectory()) {
+                        lineReader.getBuffer().write(commandPart + match + "/");
+                    } else {
+                        lineReader.getBuffer().write(commandPart + match + " ");
+                    }
+
+                } else {
+                    lineReader.getBuffer().write(match + " ");
+                }
+
                 lineReader.callWidget(LineReader.REDRAW_LINE);
                 lineReader.callWidget(LineReader.REDISPLAY);
 
                 tabCount[0] = 0;
                 return true;
             }
-            else
-            {
-                if (tabCount[0] == 0) {
-                    terminal.writer().print("\u0007");
-                    terminal.writer().flush();
 
-                    tabCount[0] = 1;
-                } else {
-                    // The second consecutive TAB prints all matches in alphabetical order.
-                    matches.sort(String::compareTo);
+            // =====================
+            // Multiple matches
+            // Calculate Longest Common Prefix
+            // =====================
 
-                    String combineMatchesResult = String.join("  ", matches);
+            String lcp = matches.getFirst();
 
-                    terminal.writer().println();
-                    terminal.writer().println(combineMatchesResult);
-                    terminal.writer().flush();
+            for (String match : matches) {
 
-                    // Restore the prompt and the user's current input after printing the matches.
-                    lineReader.callWidget(LineReader.REDRAW_LINE);
-                    lineReader.callWidget(LineReader.REDISPLAY);
+                int i = 0;
 
-                    tabCount[0] = 0;
+                while (
+                        i < lcp.length()
+                                && i < match.length()
+                                && lcp.charAt(i) == match.charAt(i)
+                ) {
+                    i++;
                 }
+
+                lcp = lcp.substring(0, i);
+            }
+
+            // =====================
+            // Extend to LCP
+            // =====================
+
+            String currentCompletionInput;
+
+            if (isPathCompletion) {
+                currentCompletionInput = pathInput;
+            } else {
+                currentCompletionInput = buffer;
+            }
+
+            if (lcp.length() > currentCompletionInput.length()) {
+
+                lineReader.getBuffer().clear();
+
+                if (isPathCompletion) {
+                    lineReader.getBuffer().write(commandPart + lcp);
+                } else {
+                    lineReader.getBuffer().write(lcp);
+                }
+
+                lineReader.callWidget(LineReader.REDRAW_LINE);
+                lineReader.callWidget(LineReader.REDISPLAY);
+
+                tabCount[0] = 0;
+                return true;
+            }
+
+            // =====================
+            // First TAB: bell
+            // Second TAB: show all matches
+            // =====================
+
+            if (tabCount[0] == 0) {
+
+                terminal.writer().print("\u0007");
+                terminal.writer().flush();
+
+                tabCount[0] = 1;
+
+            } else {
+
+                matches.sort(String::compareTo);
+
+                String combineMatchesResult =
+                        String.join("  ", matches);
+
+                terminal.writer().println();
+                terminal.writer().println(combineMatchesResult);
+                terminal.writer().flush();
+
+                lineReader.callWidget(LineReader.REDRAW_LINE);
+                lineReader.callWidget(LineReader.REDISPLAY);
+
+                tabCount[0] = 0;
             }
 
             return true;
