@@ -1,34 +1,56 @@
-[![progress-banner](https://backend.codecrafters.io/progress/shell/6d4fd1b6-6256-4c95-967d-637199304893)](https://app.codecrafters.io/users/kairui1012?r=2qF)
+# Java Shell
 
-This is a starting point for Java solutions to the
-["Build Your Own Shell" Challenge](https://app.codecrafters.io/courses/shell/overview).
+A lightweight, POSIX-inspired command-line shell built with Java 21 and JLine.
+It provides an interactive REPL for running built-in commands and external
+programs available through the system `PATH`.
 
-In this challenge, you'll build your own POSIX compliant shell that's capable of
-interpreting shell commands, running external programs and builtin commands like
-cd, pwd, echo and more. Along the way, you'll learn about shell command parsing,
-REPLs, builtin commands, and more.
+## Features
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+- Built-in commands: `exit`, `echo`, `type`, `pwd`, and `cd`
+- External program discovery and execution through `PATH`
+- Single quotes, double quotes, and backslash escaping
+- Standard output and error redirection with overwrite and append modes
+- Command completion for built-ins and executable programs
+- File and directory path completion
+- Longest common prefix completion for multiple matches
+- Alphabetically sorted suggestions after pressing Tab twice
 
-# Passing the first stage
+## Requirements
 
-The entry point for your `shell` implementation is in `src/main/java/Main.java`.
-Study and uncomment the relevant code, then run the command below to execute the
-tests on our servers:
+- Java 21
+- Maven
+
+## Run Locally
 
 ```sh
-codecrafters submit
+./your_program.sh
 ```
 
-Time to move on to the next stage!
+The shell displays a prompt where commands can be entered:
 
-# Stage 2 & beyond
+```text
+$ echo "Hello, world!"
+Hello, world!
+```
 
-Note: This section is for stages 2 and beyond.
+## Redirection Examples
 
-1. Ensure you have `mvn` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `src/main/java/Main.java`.
-1. Run `codecrafters submit` to submit your solution to CodeCrafters. Test
-   output will be streamed to your terminal.
+```sh
+echo "Hello" > output.txt
+echo "Again" >> output.txt
+command 2> error.txt
+command 2>> error.txt
+```
+
+## Project Structure
+
+```text
+src/main/java/
+├── Main.java                  Application entry point
+├── Shell.java                 REPL and command execution
+├── Navigation.java            pwd and cd behavior
+├── Quoting.java               Argument parsing and redirection detection
+├── Redirection.java           Output and error stream redirection
+├── CommandCompletion.java     Built-in and executable completion
+└── FileCompletion.java        File and directory completion
+```
