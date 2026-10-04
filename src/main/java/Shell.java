@@ -136,7 +136,11 @@ public class Shell {
                 if (files != null) {
                     for (File file : files) {
                         if (file.getName().startsWith(prefix)) {
-                            matches.add(parent + file.getName());
+                            String match = parent + file.getName();
+                            if (file.isDirectory()) {
+                                match += "/";
+                            }
+                            matches.add(match);
                         }
                     }
                 }
