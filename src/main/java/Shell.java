@@ -169,10 +169,9 @@ public class Shell {
                 lineReader.getBuffer().clear();
 
                 if (isPathCompletion) {
-                    File matchedFile = new File(match);
 
-                    if (matchedFile.isDirectory()) {
-                        lineReader.getBuffer().write(commandPart + match + "/");
+                    if (match.endsWith("/")) {
+                        lineReader.getBuffer().write(commandPart + match);
                     } else {
                         lineReader.getBuffer().write(commandPart + match + " ");
                     }
