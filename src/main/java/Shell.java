@@ -38,7 +38,7 @@ public class Shell {
         commands.put("type", (arguments, outputStream, errorStream) -> type(arguments, commands, directories, outputStream));
         commands.put("pwd", (arguments, outputStream, errorStream) -> navigation.pwd(outputStream));
         commands.put("cd", (arguments, outputStream, errorStream) -> navigation.cd(arguments));
-        commands.put("complete", (arguments, outputStream, errorStream) -> completion.complete(arguments));
+        commands.put("complete", (arguments, outputStream, errorStream) -> completion.complete(arguments,errorStream));
 
 
         CommandCompletion commandCompletion = new CommandCompletion(commands.keySet(), directories);
