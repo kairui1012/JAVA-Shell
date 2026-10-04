@@ -7,7 +7,7 @@ public class ProgrammableCompletion {
 
         if (parts.length >= 3 && parts[0].equals("-C")) {
             String command = parts[2];
-            String completer = parts[1];
+            String completer = "/"+parts[1]+"/";
             commandCompleters.put(command,completer);
         }
         else if (parts.length >= 1 && parts[0].equals("-p")) {
