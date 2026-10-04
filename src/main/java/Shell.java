@@ -106,26 +106,60 @@ public class Shell {
             }
 
             // Multiple matches: the first TAB rings the bell as a prompt.
-            if (tabCount[0] == 0) {
-                terminal.writer().print("\u0007");
-                terminal.writer().flush();
 
-                tabCount[0] = 1;
-            } else {
-                // The second consecutive TAB prints all matches in alphabetical order.
-                matches.sort(String::compareTo);
+            // STEP 1:Calculate Longest Common Prefix
+            String lcp = matches.getFirst();
 
-                String combineMatchesResult = String.join("  ", matches);
+            for (String match : matches) {
+                int i = 0;
+                while (
+                        i < lcp.length()
+                        && i < match.length()
+                        && lcp.charAt(i) == match.charAt(i)) {
+                    i++;
+                }
+                lcp = lcp.substring(0, i);
+            }
 
-                terminal.writer().println();
-                terminal.writer().println(combineMatchesResult);
-                terminal.writer().flush();
+            // STEP 2:
 
-                // Restore the prompt and the user's current input after printing the matches.
+            if (lcp.length() > currentInput.length()) {
+                // clear buffer
+                lineReader.getBuffer().clear();
+
+                // write lcp
+                lineReader.getBuffer().write(lcp);
+
+                // redraw
                 lineReader.callWidget(LineReader.REDRAW_LINE);
                 lineReader.callWidget(LineReader.REDISPLAY);
 
                 tabCount[0] = 0;
+                return true;
+            }
+            else
+            {
+                if (tabCount[0] == 0) {
+                    terminal.writer().print("\u0007");
+                    terminal.writer().flush();
+
+                    tabCount[0] = 1;
+                } else {
+                    // The second consecutive TAB prints all matches in alphabetical order.
+                    matches.sort(String::compareTo);
+
+                    String combineMatchesResult = String.join("  ", matches);
+
+                    terminal.writer().println();
+                    terminal.writer().println(combineMatchesResult);
+                    terminal.writer().flush();
+
+                    // Restore the prompt and the user's current input after printing the matches.
+                    lineReader.callWidget(LineReader.REDRAW_LINE);
+                    lineReader.callWidget(LineReader.REDISPLAY);
+
+                    tabCount[0] = 0;
+                }
             }
 
             return true;
