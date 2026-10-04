@@ -24,7 +24,7 @@ public class ProgrammableCompletion {
                 String command = parts[1];
                 if (commandCompleters.containsKey(command)){
                     outputStream.println(
-                            "complete -C " + commandCompleters.get(command) + " " + command
+                            "complete -C '" + commandCompleters.get(command) + "' " + command
                     );
                 }
                 else
