@@ -30,6 +30,7 @@ public class Shell {
 
         HashMap<String, CommandHandler> commands = new HashMap<>();
         Navigation navigation = new Navigation();
+        ProgrammableCompletion completion = new ProgrammableCompletion();
 
         // Register commands that are handled directly by this shell.
         commands.put("exit", (arguments, outputStream, errorStream) -> exit());
@@ -37,29 +38,14 @@ public class Shell {
         commands.put("type", (arguments, outputStream, errorStream) -> type(arguments, commands, directories, outputStream));
         commands.put("pwd", (arguments, outputStream, errorStream) -> navigation.pwd(outputStream));
         commands.put("cd", (arguments, outputStream, errorStream) -> navigation.cd(arguments));
+        commands.put("complete", (arguments, outputStream, errorStream) -> completion.complete(arguments));
 
-        // Start the completion list with all shell built-in command names.
-        Set<String> strings = new HashSet<>(commands.keySet());
 
-        // Add executable filenames found in every directory listed in PATH.
-        for (String directory : directories) {
-            File dir = new File(directory);
-            File[] files = dir.listFiles();
-
-            // Ignore PATH entries that cannot be read or are not directories.
-            if (files == null) {
-                continue;
-            }
-
-            for (File file : files) {
-                if (file.isFile() && file.canExecute()) {
-                    strings.add(file.getName());
-                }
-            }
-        }
+        CommandCompletion commandCompletion = new CommandCompletion(commands.keySet(), directories);
+        FileCompletion fileCompletion = new FileCompletion();
 
         // Build tab-completion candidates from shell built-ins and executable files in PATH.
-        StringsCompleter stringsCompleter = new StringsCompleter(strings);
+        StringsCompleter stringsCompleter = commandCompletion.createCompleter();
 
         // Keep backslashes in the input so the shell can apply its own escaping rules later.
         DefaultParser parser = new DefaultParser();
@@ -93,11 +79,7 @@ public class Shell {
                 // Command completion
                 // =====================
 
-                for (String executable : strings) {
-                    if (executable.startsWith(buffer)) {
-                        matches.add(executable);
-                    }
-                }
+                matches.addAll(commandCompletion.findMatches(buffer));
 
             } else {
 
@@ -105,45 +87,10 @@ public class Shell {
                 // File/path completion
                 // =====================
 
-                int lastSpace = buffer.lastIndexOf(' ');
-
-                commandPart = buffer.substring(0, lastSpace + 1);
-                pathInput = buffer.substring(lastSpace + 1);
-
-                int lastSlash = pathInput.lastIndexOf('/');
-
-                String parent;
-                String prefix;
-
-                if (lastSlash == -1) {
-                    parent = "";
-                    prefix = pathInput;
-                } else {
-                    parent = pathInput.substring(0, lastSlash + 1);
-                    prefix = pathInput.substring(lastSlash + 1);
-                }
-
-                File directory;
-
-                if (parent.isEmpty()) {
-                    directory = new File(".");
-                } else {
-                    directory = new File(parent);
-                }
-
-                File[] files = directory.listFiles();
-
-                if (files != null) {
-                    for (File file : files) {
-                        if (file.getName().startsWith(prefix)) {
-                            String match = parent + file.getName();
-                            if (file.isDirectory()) {
-                                match += "/";
-                            }
-                            matches.add(match);
-                        }
-                    }
-                }
+                FileCompletion.Result result = fileCompletion.findMatches(buffer);
+                commandPart = result.commandPart();
+                pathInput = result.pathInput();
+                matches.addAll(result.matches());
             }
 
             // =====================
