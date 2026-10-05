@@ -83,8 +83,7 @@ public class Shell {
 
             String commandPart = "";
             String pathInput = "";
-            String COMP_LINE = "";
-            int COMP_POINT = 0;
+
             if (!isPathCompletion) {
 
                 // =====================
@@ -106,9 +105,6 @@ public class Shell {
 
                     // Use the custom completer registered for this target command.
                     for (String targetCommand : completerCommandsByTarget.keySet()) {
-
-                        COMP_LINE = currentInput;
-                        COMP_POINT = COMP_LINE.length();
 
                         if (currentInput.startsWith(targetCommand + " ")) {
                             // STEP 1: Get the registered completer command for the current target command.
@@ -135,6 +131,7 @@ public class Shell {
                                     currentWord = strings[strings.length - 1];
                                 } else {
                                     currentWord = strings[1];
+                                    previousWord = strings[0];
                                 }
 
                                 commandPart = currentInput.substring(
