@@ -101,13 +101,13 @@ public class Shell {
                 if (completerCommandsByTarget.keySet()
                         .stream()
                         .anyMatch(targetCommand -> currentInput.startsWith(targetCommand + " "))) {
-                    
+
                     // Use the custom completer registered for this target command.
                     for (String targetCommand : completerCommandsByTarget.keySet()) {
                         if (currentInput.startsWith(targetCommand + " ")) {
                             // STEP 1: Get the registered completer command for the current target command.
                             String completerCommand = completerCommandsByTarget.get(targetCommand);
-
+                            commandPart = targetCommand + " ";
                             // STEP 2: Start the completer command as a separate process.
                             ProcessBuilder completerProcessBuilder = new ProcessBuilder(completerCommand);
                             Process completerProcess = null;
@@ -135,6 +135,7 @@ public class Shell {
 
                                 // STEP 6: Add the candidate to the completion matches.
                                 matches.add(completionCandidate);
+
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
