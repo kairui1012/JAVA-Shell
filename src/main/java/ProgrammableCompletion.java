@@ -11,8 +11,8 @@ public class ProgrammableCompletion {
     ) {
         String[] argumentParts = arguments.split("\\s+");
 
-        if (argumentParts[0].equals("-r") && argumentParts.length >= 3){
-            completerCommandsByTarget.remove(argumentParts[2]);
+        if (argumentParts[0].equals("-r") && argumentParts.length >= 2) {
+            completerCommandsByTarget.remove(argumentParts[argumentParts.length - 1]);
         }
 
         if (argumentParts.length >= 3 && argumentParts[0].equals("-C")) {
