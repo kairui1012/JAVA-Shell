@@ -109,8 +109,34 @@ public class Shell {
                             String completerCommand = completerCommandsByTarget.get(targetCommand);
                             commandPart = targetCommand + " ";
                             // STEP 2: Start the completer command as a separate process.
-                            ProcessBuilder completerProcessBuilder = new ProcessBuilder(completerCommand);
-                            Process completerProcess = null;
+
+                            String[] strings = currentInput.split(" ");
+                            String commandName = strings[0];
+                            String currentWord = "";
+                            String previousWord = "";
+                            if (currentInput.endsWith(" ")){
+                                if (strings.length > 1){
+                                    previousWord = strings[strings.length - 1];
+                                }
+                            }
+                            else
+                            {
+                                if (strings.length > 2){
+                                    previousWord = strings[strings.length - 2];
+                                    currentWord = strings[strings.length - 1];
+                                }else {
+                                    currentWord = strings[1];
+                                }
+                            }
+
+                            ProcessBuilder completerProcessBuilder = new ProcessBuilder(
+                                    completerCommand,
+                                    commandName,
+                                    currentWord,
+                                    previousWord
+                            );
+
+                            Process completerProcess;
                             try {
                                 completerProcess = completerProcessBuilder.start();
                             } catch (IOException e) {
@@ -132,6 +158,7 @@ public class Shell {
                             try {
                                 // STEP 5: Take the first output line as the completion candidate.
                                 String completionCandidate = completerOutputReader.readLine();
+
 
                                 // STEP 6: Add the candidate to the completion matches.
                                 if (completionCandidate != null) {
