@@ -116,6 +116,8 @@ public class Shell {
                             String currentWord = "";
                             String previousWord = "";
 
+                            pathInput = currentWord;
+
                             if (currentInput.endsWith(" ")) {
 
                                 if (strings.length > 1) {
