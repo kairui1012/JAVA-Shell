@@ -2,35 +2,44 @@ import java.io.PrintStream;
 import java.util.HashMap;
 
 public class ProgrammableCompletion {
-    public boolean complete(String arguments, PrintStream outputStream, PrintStream errorStream,HashMap<String,String> commandCompleters) {
-        String[] parts = arguments.split("\\s+");
 
-        if (parts.length >= 3 && parts[0].equals("-C")) {
-            String command = parts[2];
-            String completer = parts[1];
-            commandCompleters.put(command,completer);
-        }
-        else if (parts.length >= 1 && parts[0].equals("-p")) {
-            if (parts.length == 1)
-            {
-                commandCompleters.forEach((command, completer) -> {
+    public boolean complete(
+            String arguments,
+            PrintStream outputStream,
+            PrintStream errorStream,
+            HashMap<String, String> completerCommandsByTarget
+    ) {
+        String[] argumentParts = arguments.split("\\s+");
+
+        if (argumentParts.length >= 3 && argumentParts[0].equals("-C")) {
+            String targetCommand = argumentParts[2];
+            String completerCommand = argumentParts[1];
+
+            // Register which external completer command belongs to the target command.
+            completerCommandsByTarget.put(targetCommand, completerCommand);
+        } else if (argumentParts.length >= 1 && argumentParts[0].equals("-p")) {
+            if (argumentParts.length == 1) {
+                // Print every registered target-command and completer-command pair.
+                completerCommandsByTarget.forEach((targetCommand, completerCommand) -> {
                     outputStream.println(
-                            "complete -C '" + completer + "' " + command
+                            "complete -C '" + completerCommand + "' " + targetCommand
                     );
                 });
             }
 
-            if (parts.length > 1){
-                String command = parts[1];
-                if (commandCompleters.containsKey(command)){
+            if (argumentParts.length > 1) {
+                String targetCommand = argumentParts[1];
+
+                if (completerCommandsByTarget.containsKey(targetCommand)) {
                     outputStream.println(
-                            "complete -C '" + commandCompleters.get(command) + "' " + command
+                            "complete -C '"
+                                    + completerCommandsByTarget.get(targetCommand)
+                                    + "' "
+                                    + targetCommand
                     );
-                }
-                else
-                {
+                } else {
                     errorStream.println(
-                            "complete: " + command + ": no completion specification"
+                            "complete: " + targetCommand + ": no completion specification"
                     );
                 }
             }

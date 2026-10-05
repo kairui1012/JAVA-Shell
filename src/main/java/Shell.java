@@ -5,8 +5,7 @@ import org.jline.reader.impl.completer.StringsCompleter;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
-import java.io.File;
-import java.io.PrintStream;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -30,8 +29,10 @@ public class Shell {
 
         HashMap<String, CommandHandler> commands = new HashMap<>();
         Navigation navigation = new Navigation();
-        ProgrammableCompletion completion = new ProgrammableCompletion();
-        HashMap<String,String> commandCompleters = new HashMap<>();
+        ProgrammableCompletion programmableCompletion = new ProgrammableCompletion();
+
+        // Maps each target command to the external command that generates its completion candidates.
+        HashMap<String, String> completerCommandsByTarget = new HashMap<>();
 
         // Register commands that are handled directly by this shell.
         commands.put("exit", (arguments, outputStream, errorStream) -> exit());
@@ -39,8 +40,14 @@ public class Shell {
         commands.put("type", (arguments, outputStream, errorStream) -> type(arguments, commands, directories, outputStream));
         commands.put("pwd", (arguments, outputStream, errorStream) -> navigation.pwd(outputStream));
         commands.put("cd", (arguments, outputStream, errorStream) -> navigation.cd(arguments));
-        commands.put("complete", (arguments, outputStream, errorStream) -> completion.complete(arguments,outputStream,errorStream,commandCompleters));
-
+        commands.put("complete", (arguments, outputStream, errorStream) ->
+                programmableCompletion.complete(
+                        arguments,
+                        outputStream,
+                        errorStream,
+                        completerCommandsByTarget
+                )
+        );
 
         CommandCompletion commandCompletion = new CommandCompletion(commands.keySet(), directories);
         FileCompletion fileCompletion = new FileCompletion();
@@ -66,10 +73,12 @@ public class Shell {
 
         widgets.put("my-tab", () -> {
 
-            String buffer = lineReader.getBuffer().toString();
+            String currentInput = lineReader.getBuffer().toString();
             List<String> matches = new ArrayList<>();
+            List<String> commandsWithCustomCompleters =
+                    new ArrayList<>(completerCommandsByTarget.keySet());
 
-            boolean isPathCompletion = buffer.contains(" ");
+            boolean isPathCompletion = currentInput.contains(" ");
 
             String commandPart = "";
             String pathInput = "";
@@ -80,18 +89,64 @@ public class Shell {
                 // Command completion
                 // =====================
 
-                matches.addAll(commandCompletion.findMatches(buffer));
+                matches.addAll(commandsWithCustomCompleters);
+                matches.addAll(commandCompletion.findMatches(currentInput));
 
             } else {
 
                 // =====================
-                // File/path completion
+                // Argument completion
                 // =====================
 
-                FileCompletion.Result result = fileCompletion.findMatches(buffer);
-                commandPart = result.commandPart();
-                pathInput = result.pathInput();
-                matches.addAll(result.matches());
+                if (completerCommandsByTarget.keySet()
+                        .stream()
+                        .anyMatch(targetCommand -> currentInput.startsWith(targetCommand + " "))) {
+                    
+                    // Use the custom completer registered for this target command.
+                    for (String targetCommand : completerCommandsByTarget.keySet()) {
+                        if (currentInput.startsWith(targetCommand + " ")) {
+                            // STEP 1: Get the registered completer command for the current target command.
+                            String completerCommand = completerCommandsByTarget.get(targetCommand);
+
+                            // STEP 2: Start the completer command as a separate process.
+                            ProcessBuilder completerProcessBuilder = new ProcessBuilder(completerCommand);
+                            Process completerProcess = null;
+                            try {
+                                completerProcess = completerProcessBuilder.start();
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+
+                            // STEP 3: Wait for the completer process to finish.
+                            try {
+                                completerProcess.waitFor();
+                            } catch (InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
+
+                            // STEP 4: Read the completer process's standard output.
+                            BufferedReader completerOutputReader = new BufferedReader(
+                                    new InputStreamReader(completerProcess.getInputStream())
+                            );
+
+                            try {
+                                // STEP 5: Take the first output line as the completion candidate.
+                                String completionCandidate = completerOutputReader.readLine();
+
+                                // STEP 6: Add the candidate to the completion matches.
+                                matches.add(completionCandidate);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    }
+                } else {
+                    // Fall back to ordinary file and directory completion.
+                    FileCompletion.Result result = fileCompletion.findMatches(currentInput);
+                    commandPart = result.commandPart();
+                    pathInput = result.pathInput();
+                    matches.addAll(result.matches());
+                }
             }
 
             // =====================
@@ -166,7 +221,7 @@ public class Shell {
             if (isPathCompletion) {
                 currentCompletionInput = pathInput;
             } else {
-                currentCompletionInput = buffer;
+                currentCompletionInput = currentInput;
             }
 
             if (lcp.length() > currentCompletionInput.length()) {
