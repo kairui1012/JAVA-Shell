@@ -114,20 +114,27 @@ public class Shell {
                             String currentWord = "";
                             String previousWord = "";
 
-                            commandPart = targetCommand + " " + previousWord+ " " + currentWord;
-                            if (currentInput.endsWith(" ")){
-                                if (strings.length > 1){
+                            if (currentInput.endsWith(" ")) {
+
+                                if (strings.length > 1) {
                                     previousWord = strings[strings.length - 1];
                                 }
-                            }
-                            else
-                            {
-                                if (strings.length > 2){
+
+                                commandPart = currentInput;
+
+                            } else {
+
+                                if (strings.length > 2) {
                                     previousWord = strings[strings.length - 2];
                                     currentWord = strings[strings.length - 1];
-                                }else {
+                                } else {
                                     currentWord = strings[1];
                                 }
+
+                                commandPart = currentInput.substring(
+                                        0,
+                                        currentInput.length() - currentWord.length()
+                                );
                             }
 
                             ProcessBuilder completerProcessBuilder = new ProcessBuilder(
