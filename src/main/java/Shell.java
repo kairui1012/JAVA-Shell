@@ -171,12 +171,10 @@ public class Shell {
                             );
 
                             try {
-                                // STEP 5: Take the first output line as the completion candidate.
-                                String completionCandidate = completerOutputReader.readLine();
 
-
-                                // STEP 6: Add the candidate to the completion matches.
-                                if (completionCandidate != null) {
+                                // STEP 5: Take the all output line as the completion candidate.
+                                String completionCandidate;
+                                while ((completionCandidate = completerOutputReader.readLine()) != null) {
                                     matches.add(completionCandidate);
                                 }
 
