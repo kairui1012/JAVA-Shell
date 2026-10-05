@@ -11,7 +11,7 @@ public class ProgrammableCompletion {
     ) {
         String[] argumentParts = arguments.split("\\s+");
 
-        if (argumentParts[0].equals("-r") && argumentParts.length >= 2){
+        if (argumentParts[0].equals("-r") && argumentParts.length >= 3){
             completerCommandsByTarget.remove(argumentParts[2]);
         }
 
@@ -21,7 +21,7 @@ public class ProgrammableCompletion {
 
             // Register which external completer command belongs to the target command.
             completerCommandsByTarget.put(targetCommand, completerCommand);
-        } else if (argumentParts.length >= 1 && argumentParts[0].equals("-p")) {
+        } else if (argumentParts[0].equals("-p")) {
             if (argumentParts.length == 1) {
                 // Print every registered target-command and completer-command pair.
                 completerCommandsByTarget.forEach((targetCommand, completerCommand) -> {
