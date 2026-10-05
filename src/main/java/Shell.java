@@ -6,6 +6,7 @@ import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -82,7 +83,8 @@ public class Shell {
 
             String commandPart = "";
             String pathInput = "";
-
+            String COMP_LINE = "";
+            int COMP_POINT = 0;
             if (!isPathCompletion) {
 
                 // =====================
@@ -104,6 +106,10 @@ public class Shell {
 
                     // Use the custom completer registered for this target command.
                     for (String targetCommand : completerCommandsByTarget.keySet()) {
+
+                        COMP_LINE = currentInput;
+                        COMP_POINT = COMP_LINE.length();
+
                         if (currentInput.startsWith(targetCommand + " ")) {
                             // STEP 1: Get the registered completer command for the current target command.
                             String completerCommand = completerCommandsByTarget.get(targetCommand);
@@ -143,6 +149,10 @@ public class Shell {
                                     currentWord,
                                     previousWord
                             );
+
+                            Map<String, String> environment = completerProcessBuilder.environment();
+                            environment.put("COMP_LINE", currentInput);
+                            environment.put("COMP_POINT", String.valueOf(currentInput.getBytes(StandardCharsets.UTF_8).length));
 
                             Process completerProcess;
                             try {
