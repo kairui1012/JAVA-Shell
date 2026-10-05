@@ -137,7 +137,8 @@ public class Shell {
                                 matches.add(completionCandidate);
 
                             } catch (IOException e) {
-                                throw new RuntimeException(e);
+                                terminal.writer().print("\u0007");
+                                terminal.writer().flush();
                             }
                         }
                     }
