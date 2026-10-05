@@ -116,8 +116,6 @@ public class Shell {
                             String currentWord = "";
                             String previousWord = "";
 
-                            pathInput = currentWord;
-
                             if (currentInput.endsWith(" ")) {
 
                                 if (strings.length > 1) {
@@ -184,6 +182,9 @@ public class Shell {
                                 terminal.writer().print("\u0007");
                                 terminal.writer().flush();
                             }
+
+                            pathInput = currentWord;
+
                         }
                     }
                 } else {
