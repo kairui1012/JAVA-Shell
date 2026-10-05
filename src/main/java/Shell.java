@@ -107,13 +107,14 @@ public class Shell {
                         if (currentInput.startsWith(targetCommand + " ")) {
                             // STEP 1: Get the registered completer command for the current target command.
                             String completerCommand = completerCommandsByTarget.get(targetCommand);
-                            commandPart = targetCommand + " ";
                             // STEP 2: Start the completer command as a separate process.
 
                             String[] strings = currentInput.split(" ");
                             String commandName = strings[0];
                             String currentWord = "";
                             String previousWord = "";
+
+                            commandPart = targetCommand + " " + previousWord+ " " + currentWord;
                             if (currentInput.endsWith(" ")){
                                 if (strings.length > 1){
                                     previousWord = strings[strings.length - 1];
