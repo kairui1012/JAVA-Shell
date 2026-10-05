@@ -134,7 +134,9 @@ public class Shell {
                                 String completionCandidate = completerOutputReader.readLine();
 
                                 // STEP 6: Add the candidate to the completion matches.
-                                matches.add(completionCandidate);
+                                if (completionCandidate != null) {
+                                    matches.add(completionCandidate);
+                                }
 
                             } catch (IOException e) {
                                 terminal.writer().print("\u0007");
