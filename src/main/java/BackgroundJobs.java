@@ -1,6 +1,7 @@
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.stream.Stream;
+import java.util.List;
 
 public class BackgroundJobs {
 
@@ -11,30 +12,52 @@ public class BackgroundJobs {
             HashMap<Integer, String> backgroundCommandsMap
     ) {
 
-        int max = backgroundJobsMap.keySet()
+        List<Integer> doneJobsList = new ArrayList<>();
+
+        List<Integer> runningJobIds = backgroundJobsMap.entrySet()
                 .stream()
-                .max(Integer::compareTo)
-                .orElse(0);
+                .filter(entry -> entry.getValue().isAlive())
+                .map(entry -> entry.getKey())
+                .sorted()
+                .toList();
+
+        int latestJobId = runningJobIds.isEmpty()
+                ? -1
+                : runningJobIds.getLast();
+
+        int previousJobId = runningJobIds.size() < 2
+                ? -1
+                : runningJobIds.get(runningJobIds.size() - 2);
 
         backgroundJobsMap.forEach((jobId, process) -> {
 
-            if (process.isAlive()) {
-                if (jobId.equals(max)){
+            if (!process.isAlive()) {
+                outputStream.printf(
+                        "[%d]   %-24s%s%n",
+                        jobId,
+                        "Done",
+                        backgroundCommandsMap.get(jobId)
+                );
+                doneJobsList.add(jobId);
+            }
+            else {
+                if (jobId == latestJobId) {
                     outputStream.printf(
                             "[%d]+  %-24s%s &%n",
                             jobId,
                             "Running",
                             backgroundCommandsMap.get(jobId)
                     );
-                } else if (jobId.equals(max - 1)) {
+
+                } else if (jobId == previousJobId) {
                     outputStream.printf(
                             "[%d]-  %-24s%s &%n",
                             jobId,
                             "Running",
                             backgroundCommandsMap.get(jobId)
                     );
-                }
-                else {
+
+                } else {
                     outputStream.printf(
                             "[%d]   %-24s%s &%n",
                             jobId,
@@ -43,9 +66,13 @@ public class BackgroundJobs {
                     );
                 }
             }
-
-
         });
+
+        for (int id : doneJobsList){
+            backgroundJobsMap.remove(id);
+            backgroundCommandsMap.remove(id);
+        }
+
 
         return true;
     }
