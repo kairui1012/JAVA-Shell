@@ -6,15 +6,24 @@ import java.util.List;
 public class Pipelines {
 
     public void execute(List<String> commandLeft, List<String> commandRight) throws IOException {
-        Process leftProcess =
-                new ProcessBuilder(commandLeft).start();
+        ProcessBuilder leftBuilder =
+                new ProcessBuilder(commandLeft);
 
-        Process rightProcess =
-                new ProcessBuilder(commandRight).start();
+        ProcessBuilder rightBuilder =
+                new ProcessBuilder(commandRight);
+
+        // 右边命令直接输出到当前 shell
+        rightBuilder.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+        rightBuilder.redirectError(ProcessBuilder.Redirect.INHERIT);
+
+        Process leftProcess = leftBuilder.start();
+        Process rightProcess = rightBuilder.start();
 
         InputStream leftProcessOutput = leftProcess.getInputStream();
 
         OutputStream rightProcessInput = rightProcess.getOutputStream();
+
+
 
         Thread pipeThread = new Thread(() -> {
             try {
