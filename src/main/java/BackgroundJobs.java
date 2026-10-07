@@ -1,5 +1,6 @@
 import java.io.PrintStream;
 import java.util.HashMap;
+import java.util.stream.Stream;
 
 public class BackgroundJobs {
 
@@ -10,16 +11,37 @@ public class BackgroundJobs {
             HashMap<Integer, String> backgroundCommandsMap
     ) {
 
+        int max = backgroundJobsMap.keySet()
+                .stream()
+                .max(Integer::compareTo)
+                .orElse(0);
+
         backgroundJobsMap.forEach((jobId, process) -> {
 
             if (process.isAlive()) {
+                if (jobId.equals(max)){
+                    outputStream.printf(
+                            "[%d]+  %-24s%s &%n",
+                            jobId,
+                            "Running",
+                            backgroundCommandsMap.get(jobId)
+                    );
+                } else if (jobId.equals(max - 1)) {
+                    outputStream.printf(
+                            "[%d]-  %-24s%s &%n",
+                            jobId,
+                            "Running",
+                            backgroundCommandsMap.get(jobId)
+                    );
+                }
                 outputStream.printf(
-                        "[%d]+  %-24s%s &%n",
+                        "[%d]   %-24s%s &%n",
                         jobId,
                         "Running",
                         backgroundCommandsMap.get(jobId)
                 );
             }
+
 
         });
 
