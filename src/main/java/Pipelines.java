@@ -35,11 +35,6 @@ public class Pipelines {
         pipeThread.start();
 
 
-        InputStream rightProcessOutput =
-                rightProcess.getInputStream();
-
-        rightProcessOutput.transferTo(System.out);
-
         try {
             rightProcess.waitFor();
 
