@@ -34,12 +34,14 @@ public class BackgroundJobs {
                             backgroundCommandsMap.get(jobId)
                     );
                 }
-                outputStream.printf(
-                        "[%d]   %-24s%s &%n",
-                        jobId,
-                        "Running",
-                        backgroundCommandsMap.get(jobId)
-                );
+                else {
+                    outputStream.printf(
+                            "[%d]   %-24s%s &%n",
+                            jobId,
+                            "Running",
+                            backgroundCommandsMap.get(jobId)
+                    );
+                }
             }
 
 
