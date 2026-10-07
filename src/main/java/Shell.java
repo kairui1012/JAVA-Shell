@@ -2,6 +2,7 @@ import org.jline.keymap.KeyMap;
 import org.jline.reader.*;
 import org.jline.reader.impl.DefaultParser;
 import org.jline.reader.impl.completer.StringsCompleter;
+import org.jline.shell.Job;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
@@ -36,7 +37,9 @@ public class Shell {
 
         // Maps each target command to the external command that generates its completion candidates.
         HashMap<String, String> completerCommandsByTarget = new HashMap<>();
-        HashMap<String, ProcessBuilder> backgroundJobsMap = new HashMap<>();
+        HashMap<Integer, Process> backgroundJobsMap = new HashMap<>();
+        HashMap<Integer, String> backgroundCommandsMap = new HashMap<>();
+        int nextJobId = 1;
 
 
         // Register commands that are handled directly by this shell.
@@ -53,7 +56,14 @@ public class Shell {
                         completerCommandsByTarget
                 )
         );
-        commands.put("jobs", (arguments, outputStream, errorStream) -> backgroundJobs.jobs(arguments,backgroundJobsMap));
+        commands.put("jobs", (arguments, outputStream, errorStream) ->
+                backgroundJobs.jobs(
+                        arguments,
+                        outputStream,
+                        backgroundJobsMap,
+                        backgroundCommandsMap
+                )
+        );
 
         CommandCompletion commandCompletion = new CommandCompletion(commands.keySet(), directories);
         FileCompletion fileCompletion = new FileCompletion();
@@ -352,6 +362,13 @@ public class Shell {
 
             String command = lineReader.readLine("$ ");
 
+            boolean isBackground = command.trim().endsWith("&");
+
+            if (isBackground) {
+                command = command.trim();
+                command = command.substring(0, command.length() - 1).trim();
+            }
+
             // Split the input while preserving quoted arguments.
             List<String> parsedCommand = Quoting.parse(command, redirection);
 
@@ -373,7 +390,6 @@ public class Shell {
 
             // A handler returns true to continue the shell and false to exit.
             CommandHandler handler = commands.get(commandName);
-
 
             if (handler != null) {
                 PrintStream outputStream = System.out;
@@ -414,13 +430,24 @@ public class Shell {
             if (processCommand.isEmpty()) {
                 System.out.println(commandName + ": command not found");
             } else {
+
                 ProcessBuilder pb = new ProcessBuilder(processCommand);
-                // Connect the child process to this shell's input and output.
+
                 pb.inheritIO();
                 redirection.applyTo(pb);
 
                 Process process = pb.start();
-                process.waitFor();
+
+                if (isBackground) {
+                    int jobId = nextJobId++;
+
+                    backgroundJobsMap.put(jobId, process);
+                    backgroundCommandsMap.put(jobId, command);
+
+                    System.out.println("[" + jobId + "] " + process.pid());
+                } else {
+                    process.waitFor();
+                }
             }
         }
     }
