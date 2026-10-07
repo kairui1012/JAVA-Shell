@@ -2,7 +2,6 @@ import org.jline.keymap.KeyMap;
 import org.jline.reader.*;
 import org.jline.reader.impl.DefaultParser;
 import org.jline.reader.impl.completer.StringsCompleter;
-import org.jline.shell.Job;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
@@ -40,7 +39,6 @@ public class Shell {
         HashMap<Integer, Process> backgroundJobsMap = new HashMap<>();
         HashMap<Integer, String> backgroundCommandsMap = new HashMap<>();
         HashMap<Integer, Long> backgroundJobsProcessId = new HashMap<>();
-        int nextJobId = 1;
 
         // Register commands that are handled directly by this shell.
         commands.put("exit", (arguments, outputStream, errorStream) -> exit());
@@ -358,14 +356,11 @@ public class Shell {
 
         while (true) {
 
-            nextJobId = 1;
-            
             backgroundJobs.reapFinishedJobs(
                     System.out,
                     backgroundJobsMap,
                     backgroundCommandsMap
             );
-
 
             Redirection redirection = new Redirection();
 
@@ -448,7 +443,11 @@ public class Shell {
                 Process process = pb.start();
 
                 if (isBackground) {
-                    int jobId = nextJobId++;
+                    int jobId = 1;
+
+                    while (backgroundJobsMap.containsKey(jobId)) {
+                        jobId++;
+                    }
 
                     backgroundJobsMap.put(jobId, process);
                     backgroundCommandsMap.put(jobId, command);
