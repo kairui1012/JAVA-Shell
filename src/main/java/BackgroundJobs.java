@@ -14,35 +14,24 @@ public class BackgroundJobs {
 
         List<Integer> doneJobsList = new ArrayList<>();
 
-        List<Integer> runningJobIds = backgroundJobsMap.entrySet()
+        List<Integer> jobIds = backgroundJobsMap.keySet()
                 .stream()
-                .filter(entry -> entry.getValue().isAlive())
-                .map(entry -> entry.getKey())
                 .sorted()
                 .toList();
 
-        int latestJobId = runningJobIds.isEmpty()
+        int latestJobId = jobIds.isEmpty()
                 ? -1
-                : runningJobIds.getLast();
+                : jobIds.getLast();
 
-        int previousJobId = runningJobIds.size() < 2
+        int previousJobId = jobIds.size() < 2
                 ? -1
-                : runningJobIds.get(runningJobIds.size() - 2);
+                : jobIds.get(jobIds.size() - 2);
 
-        backgroundJobsMap.forEach((jobId, process) -> {
+        for (int jobId : jobIds) {
 
-            String status;
+            Process process = backgroundJobsMap.get(jobId);
+
             String marker;
-            String suffix;
-
-            if (process.isAlive()) {
-                status = "Running";
-                suffix = " &";
-            } else {
-                status = "Done";
-                suffix = "";
-                doneJobsList.add(jobId);
-            }
 
             if (jobId == latestJobId) {
                 marker = "+";
@@ -52,15 +41,29 @@ public class BackgroundJobs {
                 marker = " ";
             }
 
-            outputStream.printf(
-                    "[%d]%s  %-24s%s%s%n",
-                    jobId,
-                    marker,
-                    status,
-                    backgroundCommandsMap.get(jobId),
-                    suffix
-            );
-        });
+            if (process.isAlive()) {
+
+                outputStream.printf(
+                        "[%d]%s  %-24s%s &%n",
+                        jobId,
+                        marker,
+                        "Running",
+                        backgroundCommandsMap.get(jobId)
+                );
+
+            } else {
+
+                outputStream.printf(
+                        "[%d]%s  %-24s%s%n",
+                        jobId,
+                        marker,
+                        "Done",
+                        backgroundCommandsMap.get(jobId)
+                );
+
+                doneJobsList.add(jobId);
+            }
+        }
 
         for (int id : doneJobsList) {
             backgroundJobsMap.remove(id);
