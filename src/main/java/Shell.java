@@ -39,6 +39,7 @@ public class Shell {
         HashMap<String, String> completerCommandsByTarget = new HashMap<>();
         HashMap<Integer, Process> backgroundJobsMap = new HashMap<>();
         HashMap<Integer, String> backgroundCommandsMap = new HashMap<>();
+        HashMap<Integer, Long> backgroundJobsProcessId = new HashMap<>();
         int nextJobId = 1;
 
 
@@ -444,7 +445,9 @@ public class Shell {
                     backgroundJobsMap.put(jobId, process);
                     backgroundCommandsMap.put(jobId, command);
 
-                    System.out.println("[" + jobId + "] " + process.pid());
+                    System.out.println(
+                            "[" + jobId + "] " + process.pid()
+                    );
                 } else {
                     process.waitFor();
                 }
