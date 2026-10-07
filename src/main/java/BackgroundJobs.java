@@ -12,18 +12,12 @@ public class BackgroundJobs {
             HashMap<Integer, String> backgroundCommandsMap
     ) {
 
-        // First reap finished jobs
-        reapFinishedJobs(
-                outputStream,
-                backgroundJobsMap,
-                backgroundCommandsMap
-        );
-
-        // Recalculate markers after removing completed jobs
         List<Integer> jobIds = backgroundJobsMap.keySet()
                 .stream()
                 .sorted()
                 .toList();
+
+        List<Integer> doneJobsList = new ArrayList<>();
 
         int latestJobId = jobIds.isEmpty()
                 ? -1
@@ -37,10 +31,6 @@ public class BackgroundJobs {
 
             Process process = backgroundJobsMap.get(jobId);
 
-            if (!process.isAlive()) {
-                continue;
-            }
-
             String marker;
 
             if (jobId == latestJobId) {
@@ -51,13 +41,30 @@ public class BackgroundJobs {
                 marker = " ";
             }
 
-            outputStream.printf(
-                    "[%d]%s  %-24s%s &%n",
-                    jobId,
-                    marker,
-                    "Running",
-                    backgroundCommandsMap.get(jobId)
-            );
+            if (process.isAlive()) {
+                outputStream.printf(
+                        "[%d]%s  %-24s%s &%n",
+                        jobId,
+                        marker,
+                        "Running",
+                        backgroundCommandsMap.get(jobId)
+                );
+            } else {
+                outputStream.printf(
+                        "[%d]%s  %-24s%s%n",
+                        jobId,
+                        marker,
+                        "Done",
+                        backgroundCommandsMap.get(jobId)
+                );
+
+                doneJobsList.add(jobId);
+            }
+        }
+
+        for (int id : doneJobsList) {
+            backgroundJobsMap.remove(id);
+            backgroundCommandsMap.remove(id);
         }
 
         return true;
