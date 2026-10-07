@@ -43,6 +43,7 @@ public class Shell {
         int nextJobId = 1;
 
 
+
         // Register commands that are handled directly by this shell.
         commands.put("exit", (arguments, outputStream, errorStream) -> exit());
         commands.put("echo", this::echo);
@@ -358,6 +359,12 @@ public class Shell {
 
 
         while (true) {
+
+            backgroundJobs.reapFinishedJobs(
+                    System.out,
+                    backgroundJobsMap,
+                    backgroundCommandsMap
+            );
 
             Redirection redirection = new Redirection();
 
