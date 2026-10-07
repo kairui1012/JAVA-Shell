@@ -31,48 +31,41 @@ public class BackgroundJobs {
 
         backgroundJobsMap.forEach((jobId, process) -> {
 
-            if (!process.isAlive()) {
-                outputStream.printf(
-                        "[%d]   %-24s%s%n",
-                        jobId,
-                        "Done",
-                        backgroundCommandsMap.get(jobId)
-                );
+            String status;
+            String marker;
+            String suffix;
+
+            if (process.isAlive()) {
+                status = "Running";
+                suffix = " &";
+            } else {
+                status = "Done";
+                suffix = "";
                 doneJobsList.add(jobId);
             }
-            else {
-                if (jobId == latestJobId) {
-                    outputStream.printf(
-                            "[%d]+  %-24s%s &%n",
-                            jobId,
-                            "Running",
-                            backgroundCommandsMap.get(jobId)
-                    );
 
-                } else if (jobId == previousJobId) {
-                    outputStream.printf(
-                            "[%d]-  %-24s%s &%n",
-                            jobId,
-                            "Running",
-                            backgroundCommandsMap.get(jobId)
-                    );
-
-                } else {
-                    outputStream.printf(
-                            "[%d]   %-24s%s &%n",
-                            jobId,
-                            "Running",
-                            backgroundCommandsMap.get(jobId)
-                    );
-                }
+            if (jobId == latestJobId) {
+                marker = "+";
+            } else if (jobId == previousJobId) {
+                marker = "-";
+            } else {
+                marker = " ";
             }
+
+            outputStream.printf(
+                    "[%d]%s  %-24s%s%s%n",
+                    jobId,
+                    marker,
+                    status,
+                    backgroundCommandsMap.get(jobId),
+                    suffix
+            );
         });
 
-        for (int id : doneJobsList){
+        for (int id : doneJobsList) {
             backgroundJobsMap.remove(id);
             backgroundCommandsMap.remove(id);
         }
-
 
         return true;
     }
