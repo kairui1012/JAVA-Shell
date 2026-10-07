@@ -28,17 +28,18 @@ public class Shell {
                 Pattern.quote(File.pathSeparator)
         );
 
-        HashMap<String, CommandHandler> commands = new HashMap<>();
+
         Navigation navigation = new Navigation();
         ProgrammableCompletion programmableCompletion = new ProgrammableCompletion();
         BackgroundJobs backgroundJobs = new BackgroundJobs();
+        Pipelines pipelines = new Pipelines();
 
 
         // Maps each target command to the external command that generates its completion candidates.
+        HashMap<String, CommandHandler> commands = new HashMap<>();
         HashMap<String, String> completerCommandsByTarget = new HashMap<>();
         HashMap<Integer, Process> backgroundJobsMap = new HashMap<>();
         HashMap<Integer, String> backgroundCommandsMap = new HashMap<>();
-        HashMap<Integer, Long> backgroundJobsProcessId = new HashMap<>();
 
         // Register commands that are handled directly by this shell.
         commands.put("exit", (arguments, outputStream, errorStream) -> exit());
@@ -56,7 +57,6 @@ public class Shell {
         );
         commands.put("jobs", (arguments, outputStream, errorStream) ->
                 backgroundJobs.jobs(
-                        arguments,
                         outputStream,
                         backgroundJobsMap,
                         backgroundCommandsMap
@@ -367,6 +367,32 @@ public class Shell {
             String command = lineReader.readLine("$ ");
 
             boolean isBackground = command.trim().endsWith("&");
+            boolean isPipeline = command.contains("|");
+
+            if (isPipeline) {
+                String[] commandArray = command.trim().split("\\s+");
+
+                List<String> commandLeft = new ArrayList<>();
+                List<String> commandRight = new ArrayList<>();
+
+                boolean startFromLeft = true;
+
+                for (String part : commandArray) {
+                    if (part.equals("|")) {
+                        startFromLeft = false;
+                        continue;
+                    }
+
+                    if (startFromLeft) {
+                        commandLeft.add(part);
+                    } else {
+                        commandRight.add(part);
+                    }
+                }
+
+                pipelines.execute(commandLeft, commandRight);
+                continue;
+            }
 
             if (isBackground) {
                 command = command.trim();
@@ -379,6 +405,8 @@ public class Shell {
             if (parsedCommand.isEmpty()) {
                 continue;
             }
+
+
 
             String commandName = parsedCommand.getFirst();
 
