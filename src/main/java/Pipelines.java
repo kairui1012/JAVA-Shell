@@ -23,8 +23,6 @@ public class Pipelines {
 
         OutputStream rightProcessInput = rightProcess.getOutputStream();
 
-
-
         Thread pipeThread = new Thread(() -> {
             try {
                 leftProcessOutput.transferTo(rightProcessInput);
@@ -41,5 +39,18 @@ public class Pipelines {
                 rightProcess.getInputStream();
 
         rightProcessOutput.transferTo(System.out);
+
+        try {
+            rightProcess.waitFor();
+
+            if (leftProcess.isAlive()) {
+                leftProcess.destroy();
+            }
+
+            pipeThread.join();
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }
