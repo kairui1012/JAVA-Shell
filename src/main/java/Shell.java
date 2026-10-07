@@ -31,9 +31,13 @@ public class Shell {
         HashMap<String, CommandHandler> commands = new HashMap<>();
         Navigation navigation = new Navigation();
         ProgrammableCompletion programmableCompletion = new ProgrammableCompletion();
+        BackgroundJobs backgroundJobs = new BackgroundJobs();
+
 
         // Maps each target command to the external command that generates its completion candidates.
         HashMap<String, String> completerCommandsByTarget = new HashMap<>();
+        HashMap<String, ProcessBuilder> backgroundJobsMap = new HashMap<>();
+
 
         // Register commands that are handled directly by this shell.
         commands.put("exit", (arguments, outputStream, errorStream) -> exit());
@@ -49,6 +53,7 @@ public class Shell {
                         completerCommandsByTarget
                 )
         );
+        commands.put("jobs", (arguments, outputStream, errorStream) -> backgroundJobs.jobs(arguments,backgroundJobsMap));
 
         CommandCompletion commandCompletion = new CommandCompletion(commands.keySet(), directories);
         FileCompletion fileCompletion = new FileCompletion();
