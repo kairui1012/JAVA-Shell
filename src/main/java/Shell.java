@@ -14,17 +14,6 @@ import java.util.regex.Pattern;
 
 public class Shell {
 
-    @FunctionalInterface
-    private interface CommandHandler {
-        // Returns true to continue the shell or false to exit.
-        boolean execute(
-                String arguments,
-                InputStream inputStream,
-                PrintStream outputStream,
-                PrintStream errorStream
-        );
-    }
-
     public void run() throws Exception {
 
         // Split PATH into directories used to locate external programs.
@@ -373,122 +362,14 @@ public class Shell {
             String command = lineReader.readLine("$ ");
 
             boolean isBackground = command.trim().endsWith("&");
-            boolean isPipeline = command.contains("|");
-
-            if (isPipeline) {
-                String[] commandArray = command.trim().split("\\s+");
-
-                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                PrintStream outputStream = new PrintStream(buffer);
-
-                List<String> commandLeft = new ArrayList<>();
-                List<String> commandRight = new ArrayList<>();
-
-                boolean startFromLeft = true;
-
-                for (String part : commandArray) {
-
-                    if (part.equals("|")) {
-                        startFromLeft = false;
-                        continue;
-                    }
-
-                    if (startFromLeft) {
-                        commandLeft.add(part);
-                    } else {
-                        commandRight.add(part);
-                    }
-                }
-
-                boolean leftUseBuiltin =
-                        commands.containsKey(commandLeft.getFirst());
-
-                boolean rightUseBuiltin =
-                        commands.containsKey(commandRight.getFirst());
-
-                if (leftUseBuiltin && rightUseBuiltin) {
-                    // Both builtin
-
-                    executeBuiltin(
-                            commandLeft.getFirst(),
-                            String.join(" ", commandLeft.subList(1, commandLeft.size())),
-                            System.in,
-                            outputStream,
-                            System.err,
-                            commands
-                    );
-
-                    outputStream.flush();
-
-                    executeBuiltin(
-                            commandRight.getFirst(),
-                            String.join(" ", commandRight.subList(1, commandRight.size())),
-                            new ByteArrayInputStream(buffer.toByteArray()),
-                            System.out,
-                            System.err,
-                            commands
-                    );
-
-                } else if (leftUseBuiltin) {
-
-                    // Left builtin
-                    executeBuiltin(
-                            commandLeft.getFirst(),
-                            String.join(" ", commandLeft.subList(1, commandLeft.size())),
-                            System.in,
-                            outputStream,
-                            System.err,
-                            commands
-                    );
-
-                    outputStream.flush();
-
-                    // 取得左侧命令的输出
-                    byte[] result = buffer.toByteArray();
-
-                    ProcessBuilder pb = new ProcessBuilder(commandRight);
-                    pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
-                    pb.redirectError(ProcessBuilder.Redirect.INHERIT);
-
-                    Process process = pb.start();
-
-                    try (OutputStream stdin = process.getOutputStream()) {
-                        stdin.write(result);
-                    }
-
-                    process.waitFor();
-
-                } else if (rightUseBuiltin) {
-
-                    // 1. 启动左侧 External Command
-                    ProcessBuilder pb = new ProcessBuilder(commandLeft);
-
-                    pb.redirectError(ProcessBuilder.Redirect.INHERIT);
-
-                    Process process = pb.start();
-
-                    // 2. 读取左侧 stdout
-                    byte[] result;
-
-                    try (InputStream inputStream = process.getInputStream()) {
-                        result = inputStream.readAllBytes();
-                    }
-
-                    process.waitFor();
-
-                    // 3. 执行右侧 Builtin
-                    executeBuiltin(
-                            commandRight.getFirst(),
-                            String.join(" ", commandRight.subList(1, commandRight.size())),
-                            new ByteArrayInputStream(result),
-                            System.out,
-                            System.err,
-                            commands
-                    );
-
-                } else {
-                    pipelines.execute(commandLeft, commandRight);
-                }
+            if (pipelines.isPipeline(command)) {
+                pipelines.execute(
+                        command,
+                        commands,
+                        System.in,
+                        System.out,
+                        System.err
+                );
 
                 continue;
             }
@@ -635,24 +516,6 @@ public class Shell {
             }
         }
 
-        return true;
-    }
-
-    private boolean executeBuiltin(
-            String commandName,
-            String arguments,
-            InputStream inputStream,
-            PrintStream outputStream,
-            PrintStream errorStream,
-            HashMap<String, CommandHandler> commands
-    ) {
-        CommandHandler handler = commands.get(commandName);
-
-        if (handler == null) {
-            return false;
-        }
-
-        handler.execute(arguments, inputStream, outputStream, errorStream);
         return true;
     }
 
