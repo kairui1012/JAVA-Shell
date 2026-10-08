@@ -27,6 +27,7 @@ public class Shell {
         ProgrammableCompletion programmableCompletion = new ProgrammableCompletion();
         BackgroundJobs backgroundJobs = new BackgroundJobs();
         Pipelines pipelines = new Pipelines();
+        History history = new History();
 
 
         // Maps each target command to the external command that generates its completion candidates.
@@ -55,6 +56,11 @@ public class Shell {
                         outputStream,
                         backgroundJobsMap,
                         backgroundCommandsMap
+                )
+        );
+        commands.put("history", (arguments, inputStream, outputStream, errorStream) ->
+                history.history(
+                        outputStream
                 )
         );
 
@@ -366,7 +372,6 @@ public class Shell {
                 pipelines.execute(
                         command,
                         commands,
-                        System.in,
                         System.out,
                         System.err
                 );
