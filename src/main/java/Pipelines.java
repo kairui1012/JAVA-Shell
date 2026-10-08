@@ -1,6 +1,5 @@
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 public class Pipelines {
 
@@ -16,113 +15,123 @@ public class Pipelines {
             PrintStream errorStream
     ) throws IOException, InterruptedException {
 
-        List<List<String>> pipelineCommands = parse(command);
+        List<List<String>> pipeline = parse(command);
 
-        if (pipelineCommands.stream().anyMatch(List::isEmpty)) {
+        if (pipeline.stream().anyMatch(List::isEmpty)) {
             errorStream.println("Invalid pipeline");
             return;
         }
 
-        List<Thread> threads = new ArrayList<>();
-        InputStream currentInput = inputStream;
+        boolean allExternal = pipeline.stream()
+                .noneMatch(cmd -> commands.containsKey(cmd.getFirst()));
 
-        for (int i = 0; i < pipelineCommands.size(); i++) {
-
-            List<String> currentCommand = pipelineCommands.get(i);
-
-            boolean isFirst = i == 0;
-            boolean isLast = i == pipelineCommands.size() - 1;
-
-            OutputStream currentOutput;
-            InputStream nextInput = null;
-
-            if (isLast) {
-                currentOutput = outputStream;
-            } else {
-                PipedInputStream pipeInput = new PipedInputStream(8192);
-                currentOutput = new PipedOutputStream(pipeInput);
-                nextInput = pipeInput;
-            }
-
-            InputStream finalInput = isFirst
-                    ? InputStream.nullInputStream()
-                    : currentInput;
-
-            OutputStream finalOutput = currentOutput;
-
-            Thread commandThread = new Thread(() -> {
-
-                try {
-                    if (commands.containsKey(currentCommand.getFirst())) {
-
-                        PrintStream builtinOutput =
-                                new PrintStream(finalOutput, true);
-
-                        executeBuiltin(
-                                currentCommand,
-                                finalInput,
-                                builtinOutput,
-                                errorStream,
-                                commands
-                        );
-
-                        builtinOutput.flush();
-
-                    } else {
-                        executeExternal(
-                                currentCommand,
-                                finalInput,
-                                finalOutput
-                        );
-                    }
-
-                } catch (IOException e) {
-                    errorStream.println(e.getMessage());
-
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-
-                } finally {
-                    if (!isFirst) {
-                        closeQuietly(finalInput);
-                    }
-
-                    if (!isLast) {
-                        closeQuietly(finalOutput);
-                    }
-                }
-            });
-
-            threads.add(commandThread);
-            commandThread.start();
-
-            currentInput = nextInput;
-        }
-
-        for (Thread thread : threads) {
-            thread.join();
+        if (allExternal) {
+            executeExternalPipeline(pipeline, outputStream);
+        } else {
+            executeMixedPipeline(pipeline, commands, outputStream, errorStream);
         }
     }
 
-    private List<List<String>> parse(String command) {
+    // External | External | External
+    private void executeExternalPipeline(
+            List<List<String>> pipeline,
+            PrintStream outputStream
+    ) throws IOException, InterruptedException {
 
-        List<List<String>> pipelineCommands = new ArrayList<>();
+        List<ProcessBuilder> builders = new ArrayList<>();
 
-        // Split pipeline stages, then reuse the existing quoting parser.
-        // This version expects spaces around the pipe operator.
-        String[] parts = command.split("\\s+\\|\\s+", -1);
-
-        for (String part : parts) {
-
-            List<String> parsedCommand = Quoting.parse(
-                    part,
-                    new Redirection()
-            );
-
-            pipelineCommands.add(parsedCommand);
+        for (List<String> command : pipeline) {
+            ProcessBuilder pb = new ProcessBuilder(command);
+            pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+            builders.add(pb);
         }
 
-        return pipelineCommands;
+        List<Process> processes = ProcessBuilder.startPipeline(builders);
+
+        try {
+            // First command receives EOF instead of terminal input.
+            processes.getFirst().getOutputStream().close();
+
+            Process last = processes.getLast();
+
+            // Stream output immediately.
+            try (InputStream stdout = last.getInputStream()) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+
+                while ((bytesRead = stdout.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                    outputStream.flush();
+                }
+            }
+
+            // Wait for the last command only.
+            last.waitFor();
+
+        } finally {
+            // Stop upstream processes that may still be running.
+            for (Process process : processes) {
+                if (process.isAlive()) {
+                    process.destroy();
+                }
+            }
+        }
+    }
+
+    // Builtin | External | Builtin
+    private void executeMixedPipeline(
+            List<List<String>> pipeline,
+            Map<String, CommandHandler> commands,
+            PrintStream outputStream,
+            PrintStream errorStream
+    ) throws IOException, InterruptedException {
+
+        byte[] previousOutput = new byte[0];
+
+        for (int i = 0; i < pipeline.size(); i++) {
+
+            List<String> command = pipeline.get(i);
+            boolean isLast = i == pipeline.size() - 1;
+
+            InputStream stdin = new ByteArrayInputStream(previousOutput);
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+
+            PrintStream stdout = isLast
+                    ? outputStream
+                    : new PrintStream(buffer);
+
+            try {
+                if (commands.containsKey(command.getFirst())) {
+
+                    executeBuiltin(
+                            command,
+                            stdin,
+                            stdout,
+                            errorStream,
+                            commands
+                    );
+
+                } else {
+
+                    executeExternal(
+                            command,
+                            stdin,
+                            stdout
+                    );
+                }
+
+                stdout.flush();
+
+                if (!isLast) {
+                    previousOutput = buffer.toByteArray();
+                }
+
+            } finally {
+                if (!isLast) {
+                    stdout.close();
+                }
+            }
+        }
     }
 
     private void executeBuiltin(
@@ -163,73 +172,37 @@ public class Pipelines {
 
         Process process = pb.start();
 
-        // Upstream stdout -> process stdin
-        Thread inputThread = new Thread(() -> {
-            try (OutputStream processInput = process.getOutputStream()) {
-
-                inputStream.transferTo(processInput);
-
+        Thread writer = new Thread(() -> {
+            try (OutputStream stdin = process.getOutputStream()) {
+                inputStream.transferTo(stdin);
             } catch (IOException ignored) {
-                // The process may stop reading before input is exhausted.
+                // Process may exit before reading all input.
             }
         });
 
-        // Process stdout -> downstream stdin
-        Thread outputThread = new Thread(() -> {
-            try (InputStream processOutput = process.getInputStream()) {
+        writer.start();
 
-                processOutput.transferTo(outputStream);
-                outputStream.flush();
-
-            } catch (IOException e) {
-                terminateProcess(process);
-            }
-        });
-
-        inputThread.start();
-        outputThread.start();
-
-        try {
-            process.waitFor();
-
-        } catch (InterruptedException e) {
-            terminateProcess(process);
-            throw e;
-
-        } finally {
-            inputThread.interrupt();
+        try (InputStream stdout = process.getInputStream()) {
+            stdout.transferTo(outputStream);
+            outputStream.flush();
         }
 
-        inputThread.join();
-        outputThread.join();
+        process.waitFor();
+        writer.join();
     }
 
-    private void terminateProcess(Process process) {
+    private List<List<String>> parse(String command) {
 
-        if (!process.isAlive()) {
-            return;
+        List<List<String>> pipeline = new ArrayList<>();
+
+        String[] parts = command.split("\\s+\\|\\s+", -1);
+
+        for (String part : parts) {
+            pipeline.add(
+                    Quoting.parse(part, new Redirection())
+            );
         }
 
-        process.destroy();
-
-        try {
-            if (!process.waitFor(200, TimeUnit.MILLISECONDS)) {
-                process.destroyForcibly();
-            }
-
-        } catch (InterruptedException e) {
-            process.destroyForcibly();
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private void closeQuietly(Closeable stream) {
-
-        try {
-            stream.close();
-
-        } catch (IOException ignored) {
-            // Stream may already be closed.
-        }
+        return pipeline;
     }
 }
