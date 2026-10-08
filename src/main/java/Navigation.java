@@ -4,10 +4,16 @@ import java.nio.file.Path;
 
 public class Navigation {
 
-    private String currentDirectory = System.getProperty("user.dir");
+    private final InheritableThreadLocal<String> currentDirectory =
+            new InheritableThreadLocal<>() {
+                @Override
+                protected String initialValue() {
+                    return System.getProperty("user.dir");
+                }
+            };
 
     public boolean pwd(PrintStream outputStream) {
-        outputStream.println(currentDirectory);
+        outputStream.println(currentDirectory.get());
         return true;
     }
 
@@ -20,7 +26,7 @@ public class Navigation {
         }
 
         if (input.isEmpty()) {
-            currentDirectory = System.getProperty("user.home");
+            currentDirectory.set(System.getProperty("user.home"));
         } else if (input.equals("~") || input.startsWith("~/")) {
             Path path = Path.of(homeDirectory);
 
@@ -33,16 +39,16 @@ public class Navigation {
                 return false;
             }
 
-            currentDirectory = path.toString();
+            currentDirectory.set(path.toString());
         } else {
-            Path path = Path.of(currentDirectory)
+            Path path = Path.of(currentDirectory.get())
                     .resolve(input)
                     .normalize();
 
             if (!Files.isDirectory(path)) {
                 System.out.println("cd: no such file or directory: " + arguments);
             } else {
-                currentDirectory = path.toString();
+                currentDirectory.set(path.toString());
             }
         }
 

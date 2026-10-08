@@ -83,7 +83,10 @@ public class Pipelines {
                         );
 
                         builtinOutput.flush();
-                        builtinOutput.checkError();
+
+                        if (builtinOutput.checkError()) {
+                            return;
+                        }
 
                     } else {
 
