@@ -17,7 +17,12 @@ public class Shell {
     @FunctionalInterface
     private interface CommandHandler {
         // Returns true to continue the shell or false to exit.
-        boolean execute(String arguments, PrintStream outputStream, PrintStream errorStream);
+        boolean execute(
+                String arguments,
+                InputStream inputStream,
+                PrintStream outputStream,
+                PrintStream errorStream
+        );
     }
 
     public void run() throws Exception {
@@ -42,12 +47,13 @@ public class Shell {
         HashMap<Integer, String> backgroundCommandsMap = new HashMap<>();
 
         // Register commands that are handled directly by this shell.
-        commands.put("exit", (arguments, outputStream, errorStream) -> exit());
+        commands.put("exit", (arguments, inputStream, outputStream, errorStream) -> exit());
         commands.put("echo", this::echo);
-        commands.put("type", (arguments, outputStream, errorStream) -> type(arguments, commands, directories, outputStream));
-        commands.put("pwd", (arguments, outputStream, errorStream) -> navigation.pwd(outputStream));
-        commands.put("cd", (arguments, outputStream, errorStream) -> navigation.cd(arguments));
-        commands.put("complete", (arguments, outputStream, errorStream) ->
+        commands.put("type", (arguments, inputStream, outputStream, errorStream) ->
+                type(arguments, commands, directories, outputStream));
+        commands.put("pwd", (arguments, inputStream, outputStream, errorStream) -> navigation.pwd(outputStream));
+        commands.put("cd", (arguments, inputStream, outputStream, errorStream) -> navigation.cd(arguments));
+        commands.put("complete", (arguments, inputStream, outputStream, errorStream) ->
                 programmableCompletion.complete(
                         arguments,
                         outputStream,
@@ -55,7 +61,7 @@ public class Shell {
                         completerCommandsByTarget
                 )
         );
-        commands.put("jobs", (arguments, outputStream, errorStream) ->
+        commands.put("jobs", (arguments, inputStream, outputStream, errorStream) ->
                 backgroundJobs.jobs(
                         outputStream,
                         backgroundJobsMap,
@@ -372,12 +378,16 @@ public class Shell {
             if (isPipeline) {
                 String[] commandArray = command.trim().split("\\s+");
 
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                PrintStream outputStream = new PrintStream(buffer);
+
                 List<String> commandLeft = new ArrayList<>();
                 List<String> commandRight = new ArrayList<>();
 
                 boolean startFromLeft = true;
 
                 for (String part : commandArray) {
+
                     if (part.equals("|")) {
                         startFromLeft = false;
                         continue;
@@ -390,7 +400,96 @@ public class Shell {
                     }
                 }
 
-                pipelines.execute(commandLeft, commandRight);
+                boolean leftUseBuiltin =
+                        commands.containsKey(commandLeft.getFirst());
+
+                boolean rightUseBuiltin =
+                        commands.containsKey(commandRight.getFirst());
+
+                if (leftUseBuiltin && rightUseBuiltin) {
+                    // Both builtin
+
+                    executeBuiltin(
+                            commandLeft.getFirst(),
+                            String.join(" ", commandLeft.subList(1, commandLeft.size())),
+                            System.in,
+                            outputStream,
+                            System.err,
+                            commands
+                    );
+
+                    outputStream.flush();
+
+                    executeBuiltin(
+                            commandRight.getFirst(),
+                            String.join(" ", commandRight.subList(1, commandRight.size())),
+                            new ByteArrayInputStream(buffer.toByteArray()),
+                            System.out,
+                            System.err,
+                            commands
+                    );
+
+                } else if (leftUseBuiltin) {
+
+                    // Left builtin
+                    executeBuiltin(
+                            commandLeft.getFirst(),
+                            String.join(" ", commandLeft.subList(1, commandLeft.size())),
+                            System.in,
+                            outputStream,
+                            System.err,
+                            commands
+                    );
+
+                    outputStream.flush();
+
+                    // 取得左侧命令的输出
+                    byte[] result = buffer.toByteArray();
+
+                    ProcessBuilder pb = new ProcessBuilder(commandRight);
+                    pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+                    pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+
+                    Process process = pb.start();
+
+                    try (OutputStream stdin = process.getOutputStream()) {
+                        stdin.write(result);
+                    }
+
+                    process.waitFor();
+
+                } else if (rightUseBuiltin) {
+
+                    // 1. 启动左侧 External Command
+                    ProcessBuilder pb = new ProcessBuilder(commandLeft);
+
+                    pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+
+                    Process process = pb.start();
+
+                    // 2. 读取左侧 stdout
+                    byte[] result;
+
+                    try (InputStream inputStream = process.getInputStream()) {
+                        result = inputStream.readAllBytes();
+                    }
+
+                    process.waitFor();
+
+                    // 3. 执行右侧 Builtin
+                    executeBuiltin(
+                            commandRight.getFirst(),
+                            String.join(" ", commandRight.subList(1, commandRight.size())),
+                            new ByteArrayInputStream(result),
+                            System.out,
+                            System.err,
+                            commands
+                    );
+
+                } else {
+                    pipelines.execute(commandLeft, commandRight);
+                }
+
                 continue;
             }
 
@@ -430,7 +529,7 @@ public class Shell {
                     outputStream = redirection.openOutputStream(System.out);
                     errorStream = redirection.openErrorStream(System.err);
 
-                    if (!handler.execute(parsedArgumentLine, outputStream, errorStream)) {
+                    if (!handler.execute(parsedArgumentLine, System.in, outputStream, errorStream)) {
                         break;
                     }
 
@@ -496,7 +595,12 @@ public class Shell {
         return false;
     }
 
-    private boolean echo(String arguments, PrintStream outputStream,PrintStream errorStream ) {
+    private boolean echo(
+            String arguments,
+            InputStream inputStream,
+            PrintStream outputStream,
+            PrintStream errorStream
+    ) {
         outputStream.println(arguments);
         return true;
     }
@@ -531,6 +635,24 @@ public class Shell {
             }
         }
 
+        return true;
+    }
+
+    private boolean executeBuiltin(
+            String commandName,
+            String arguments,
+            InputStream inputStream,
+            PrintStream outputStream,
+            PrintStream errorStream,
+            HashMap<String, CommandHandler> commands
+    ) {
+        CommandHandler handler = commands.get(commandName);
+
+        if (handler == null) {
+            return false;
+        }
+
+        handler.execute(arguments, inputStream, outputStream, errorStream);
         return true;
     }
 
