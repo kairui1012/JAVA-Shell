@@ -1,6 +1,8 @@
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.ListIterator;
 
 public class History {
@@ -18,11 +20,19 @@ public class History {
             if (parts[0].equals("-r")) {
                 // parts[1] 就是文件路径
                 String filePath = parts[1];
+                List<String> lines = null;
                 try {
-                    lineHistory.read(Path.of(filePath), false);
+                    lines = Files.readAllLines(Path.of(filePath));
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
+
+                for (String line : lines) {
+                    lineHistory.add(line);
+                }
+            }
+            else if (parts[0].equals("-r")){
+
             }
 
 
