@@ -35,7 +35,9 @@ public class Shell {
         HashMap<Integer, String> backgroundCommandsMap = new HashMap<>();
 
         // Register commands that run inside this shell instead of starting an external process.
-        commands.put("exit", (arguments, inputStream, outputStream, errorStream) -> exit());
+        commands.put("exit", (arguments, inputStream, outputStream, errorStream) ->
+                exit(lineHistory)
+        );
         commands.put("echo", this::echo);
         commands.put(
                 "type",
@@ -474,7 +476,25 @@ public class Shell {
     }
 
     // Tell the main loop to terminate after the exit built-in runs.
-    private boolean exit() {
+    private boolean exit(org.jline.reader.History lineHistory) {
+
+        String histFile = System.getenv("HISTFILE");
+
+        if (histFile != null && !histFile.isBlank()) {
+
+            StringBuilder content = new StringBuilder();
+
+            for (org.jline.reader.History.Entry entry : lineHistory) {
+                content.append(entry.line()).append("\n");
+            }
+
+            try {
+                Files.writeString(Path.of(histFile), content.toString());
+            } catch (IOException e) {
+                System.err.println("history: " + e.getMessage());
+            }
+        }
+
         return false;
     }
 
