@@ -2,6 +2,7 @@ import org.jline.keymap.KeyMap;
 import org.jline.reader.*;
 import org.jline.reader.impl.DefaultParser;
 import org.jline.reader.impl.completer.StringsCompleter;
+import org.jline.reader.impl.history.DefaultHistory;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
@@ -24,13 +25,13 @@ public class Shell {
         BackgroundJobs backgroundJobs = new BackgroundJobs();
         Pipelines pipelines = new Pipelines();
         History history = new History();
+        org.jline.reader.History lineHistory = new DefaultHistory();
 
         // Maps each target command to the external command that generates its completion candidates.
         HashMap<String, CommandHandler> commands = new HashMap<>();
         HashMap<String, String> completerCommandsByTarget = new HashMap<>();
         HashMap<Integer, Process> backgroundJobsMap = new HashMap<>();
         HashMap<Integer, String> backgroundCommandsMap = new HashMap<>();
-        HashMap<Integer, String> historyHashMap = new HashMap<>();
 
         // Register commands that are handled directly by this shell.
         commands.put("exit", (arguments, inputStream, outputStream, errorStream) -> exit());
@@ -75,11 +76,9 @@ public class Shell {
                         history.history(
                                 arguments,
                                 outputStream,
-                                historyHashMap
+                                lineHistory
                         )
         );
-
-        int historyQuantity = 0;
 
         CommandCompletion commandCompletion = new CommandCompletion(commands.keySet(), directories);
         FileCompletion fileCompletion = new FileCompletion();
@@ -94,7 +93,8 @@ public class Shell {
         // Combine parsing and completion behavior, then attach the reader to the terminal.
         LineReaderBuilder lineReaderBuilder = LineReaderBuilder.builder()
                 .parser(parser)
-                .completer(stringsCompleter);
+                .completer(stringsCompleter)
+                .history(lineHistory);
         Terminal terminal = TerminalBuilder.terminal();
         LineReader lineReader = lineReaderBuilder.terminal(terminal).build();
 
@@ -365,7 +365,6 @@ public class Shell {
             Redirection redirection = new Redirection();
 
             String command = lineReader.readLine("$ ");
-            historyQuantity = historyQuantity + 1;
 
             boolean isBackground = command.trim().endsWith("&");
 
@@ -407,7 +406,6 @@ public class Shell {
             CommandHandler handler = commands.get(commandName);
 
             if (handler != null) {
-                historyHashMap.put(historyQuantity, command.trim());
                 PrintStream outputStream = System.out;
                 PrintStream errorStream = System.err;
 
@@ -450,7 +448,6 @@ public class Shell {
 
             if (processCommand.isEmpty()) {
                 System.out.println(commandName + ": command not found");
-                historyHashMap.put(historyQuantity, "invalid_command");
             } else {
                 ProcessBuilder pb = new ProcessBuilder(processCommand);
 
@@ -471,7 +468,6 @@ public class Shell {
 
                     System.out.println("[" + jobId + "] " + process.pid());
                 } else {
-                    historyHashMap.put(historyQuantity, command.trim());
                     process.waitFor();
                 }
             }

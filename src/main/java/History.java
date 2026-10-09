@@ -1,22 +1,26 @@
 import java.io.PrintStream;
-import java.util.HashMap;
+import java.util.ListIterator;
 
 public class History {
-    public boolean history(String arguments, PrintStream outputStream, HashMap<Integer, String> historyHashMap) {
+    public boolean history(
+            String arguments,
+            PrintStream outputStream,
+            org.jline.reader.History lineHistory
+    ) {
+        int start = lineHistory.first();
 
         if (!arguments.isBlank()) {
             int limit = Integer.parseInt(arguments.trim());
-            int start = Math.max(1, historyHashMap.size() - limit + 1);
-
-            for (int i = start; i <= historyHashMap.size(); i++) {
-                outputStream.printf("%5d  %s%n", i, historyHashMap.get(i));
-            }
-            return true;
+            start = Math.max(lineHistory.first(), lineHistory.last() - limit + 1);
         }
 
-        for (int i = 1; i <= historyHashMap.size(); i++) {
-            outputStream.printf("%5d  %s%n", i, historyHashMap.get(i));
+        ListIterator<org.jline.reader.History.Entry> entries = lineHistory.iterator(start);
+
+        while (entries.hasNext()) {
+            org.jline.reader.History.Entry entry = entries.next();
+            outputStream.printf("%5d  %s%n", entry.index() + 1, entry.line());
         }
+
         return true;
     }
 }
