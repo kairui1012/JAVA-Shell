@@ -410,38 +410,35 @@ public class Shell {
                     parsedCommand.size()
             );
 
-            String parsedArgumentLine = String.join(" ", parsedArguments);
+            Pattern pattern = Pattern.compile(
+                    "\\$\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}|\\$([a-zA-Z_][a-zA-Z0-9_]*)"
+            );
 
-            for (int i = 0; i < parsedArguments.size(); i++) {
+            List<String> expandedArguments = new ArrayList<>();
 
-                String argument = parsedArguments.get(i);
-
-                // Support both $VAR and ${VAR}
-                Pattern pattern = Pattern.compile(
-                        "\\$\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}|\\$([a-zA-Z_][a-zA-Z0-9_]*)"
-                );
+            for (String argument : parsedArguments) {
 
                 Matcher matcher = pattern.matcher(argument);
 
                 String expandedArgument = matcher.replaceAll(match -> {
 
-                    // ${VAR} uses group(1), $VAR uses group(2)
                     String variableName = match.group(1) != null
                             ? match.group(1)
                             : match.group(2);
 
-                    if (variablesMap.containsKey(variableName)) {
+                    String variableValue = variablesMap.getOrDefault(variableName, "");
 
-                        String variableValue = variablesMap.get(variableName);
-
-                        return Matcher.quoteReplacement(variableValue);
-                    }
-
-                    return Matcher.quoteReplacement(match.group());
+                    return Matcher.quoteReplacement(variableValue);
                 });
 
-                parsedArguments.set(i, expandedArgument);
+                // Remove arguments that become empty after expansion
+                if (!expandedArgument.isEmpty()) {
+                    expandedArguments.add(expandedArgument);
+                }
             }
+
+            parsedArguments = expandedArguments;
+            String parsedArgumentLine = String.join(" ", parsedArguments);
 
             List<String> processCommand = new ArrayList<>();
 

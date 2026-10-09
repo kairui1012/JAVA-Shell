@@ -7,9 +7,10 @@
 **A POSIX-inspired interactive shell built from scratch in Java.**
 
 This project implements command dispatch, quote-aware parsing, PATH lookup,
-stream redirection, pipelines, background jobs, command history, and a
-Bash-inspired programmable completion protocol. JLine provides terminal input
-and line editing, while the shell owns the parsing and execution behavior.
+stream redirection, pipelines, background jobs, command history, shell-local
+variables, parameter expansion, and a Bash-inspired programmable completion
+protocol. JLine provides terminal input and line editing, while the shell owns
+the parsing and execution behavior.
 
 ## Highlights
 
@@ -21,6 +22,7 @@ and line editing, while the shell owns the parsing and execution behavior.
 - **External and mixed pipelines** containing child processes and built-ins
 - **Background job tracking** with job IDs, running states, and completion notices
 - **JLine-backed history** with optional file loading, reading, writing, and appending
+- **Shell-local variables** with `declare`, `$VAR`, and `${VAR}` expansion
 - **Context-aware Tab completion** for commands, executables, files, and directories
 - **Programmable completion** through external completer processes
 
@@ -28,22 +30,24 @@ and line editing, while the shell owns the parsing and execution behavior.
 
 ```text
                                  ┌──────────────────────┐
-User input ──► JLine LineReader ─► quote-aware parsing │
-         │                       └──────────┬───────────┘
-         │                                  │
-         │                   ┌──────────────┼──────────────┐
-         │                   ▼              ▼              ▼
-         │               built-in       external       pipeline
-         │                handler        process        executor
-         │                                  │              │
-         │                                  ├─ foreground  ├─ external stages
-         │                                  └─ background  └─ mixed stages
+User input ──► JLine LineReader ──┬──► pipeline executor
+         │                        │      ├─ external stages
+         │                        │      └─ mixed stages
+         │                        │
+         │                        └──► quote-aware parsing ──► parameter expansion
+         │                                                        │
+         │                                            ┌───────────┴───────────┐
+         │                                            ▼                       ▼
+         │                                      built-in handler       ProcessBuilder
+         │                                                               ├─ foreground
+         │                                                               └─ background
          │
          └──► custom Tab widget ──► command, path, or programmable completion
 ```
 
-The implementation separates parsing, navigation, redirection, pipelines,
-background jobs, history, and completion into focused classes.
+The implementation separates parsing, parameter expansion, navigation,
+redirection, pipelines, background jobs, history, and completion into focused
+classes.
 
 ## Built-in Commands
 
@@ -59,6 +63,8 @@ background jobs, history, and completion into focused classes.
 | `history -r <file>` | Reads commands from a file into the current JLine history |
 | `history -w <file>` | Writes the current history to a file |
 | `history -a <file>` | Appends history entries not previously appended during this session |
+| `declare NAME=value` | Creates or updates a shell-local variable |
+| `declare -p NAME` | Prints a shell-local variable and its value |
 | `exit` | Terminates the shell |
 
 ## Parsing and Redirection
@@ -138,8 +144,33 @@ lines are loaded into the current history:
 HISTFILE="$HOME/.java_shell_history" ./your_program.sh
 ```
 
-The shell does not automatically write history back to `HISTFILE`; use
-`history -w` or `history -a` when persistence is required.
+When `exit` runs with `HISTFILE` set, the complete in-memory history is written
+back to that path. This creates the file when necessary and replaces its
+previous contents. The explicit `history -w` and `history -a` commands remain
+available when history needs to be saved before exiting.
+
+## Variables and Parameter Expansion
+
+Use `declare` to create shell-local variables and inspect their values:
+
+```sh
+declare PROJECT=java-shell
+declare -p PROJECT
+```
+
+Built-in and ordinary external-command arguments support both `$VAR` and
+`${VAR}` forms:
+
+```sh
+echo $PROJECT
+printf "%s\n" $PROJECT
+printf "%s\n" ${PROJECT}
+```
+
+Undefined variables expand to an empty value. If an argument becomes empty
+after expansion, that argument is omitted before command dispatch. These
+variables are maintained by the shell and are not exported as child-process
+environment variables.
 
 ## Completion
 
@@ -245,6 +276,7 @@ src/main/java/
 ├── Shell.java                   REPL, dispatch, completion, and process execution
 ├── CommandHandler.java          Common interface for built-in commands
 ├── Quoting.java                 Quote-aware tokenization and redirect parsing
+├── ParameterExpansion.java      Shell-local variable declaration
 ├── Redirection.java             Built-in and child-process stream routing
 ├── Navigation.java              pwd and cd behavior
 ├── Pipelines.java               External and mixed pipeline execution
@@ -255,10 +287,14 @@ src/main/java/
 └── ProgrammableCompletion.java  Runtime completion registration
 ```
 
-## Current Scope
+## Engineering Focus
 
-This is a learning-focused, POSIX-inspired shell rather than a complete POSIX
-implementation. Pipeline separators currently require whitespace on both sides,
-background execution is implemented for single external commands, and features
-such as variable expansion, globbing, command substitution, and job-control
-signals are outside the current scope.
+This project demonstrates practical systems programming and Java application
+design through:
+
+- Character-by-character parsing with quote, escape, and redirection state
+- Process orchestration for foreground commands, background jobs, and pipelines
+- Explicit stdin, stdout, and stderr routing across built-ins and child processes
+- Stateful REPL features including history, variables, navigation, and completion
+- Modular command handlers and focused components for maintainable extension
+- Terminal integration with JLine and executable packaging through Maven Assembly
