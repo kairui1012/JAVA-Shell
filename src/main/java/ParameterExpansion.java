@@ -46,11 +46,9 @@ public class ParameterExpansion {
             leftVariable.add(assignment[0].trim());
             rightValue.add(assignment[1]);
 
-            if (leftVariable.getFirst().isEmpty()
-                    || Character.isDigit(leftVariable.getFirst().charAt(0))) {
-
+            if (!leftVariable.getFirst().matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
                 errorStream.println(
-                        "declare: `" + arguments + "': not a valid identifier"
+                        "declare: `" + arguments.trim() + "': not a valid identifier"
                 );
                 return true;
             }
