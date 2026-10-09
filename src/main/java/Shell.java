@@ -83,6 +83,16 @@ public class Shell {
                                 lineHistory
                         )
         );
+        commands.put(
+                "declare",
+                (arguments, inputStream, outputStream, errorStream) ->
+                        ParameterExpansion.declare(
+                                arguments,
+                                outputStream,
+                                errorStream
+                        )
+        );
+
 
         CommandCompletion commandCompletion = new CommandCompletion(commands.keySet(), directories);
         FileCompletion fileCompletion = new FileCompletion();
