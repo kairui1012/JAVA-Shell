@@ -35,6 +35,7 @@ public class Shell {
         HashMap<String, String> completerCommandsByTarget = new HashMap<>();
         HashMap<Integer, Process> backgroundJobsMap = new HashMap<>();
         HashMap<Integer, String> backgroundCommandsMap = new HashMap<>();
+        HashMap<Integer, String> historyHashMap = new HashMap<>();
 
         // Register commands that are handled directly by this shell.
         commands.put("exit", (arguments, inputStream, outputStream, errorStream) -> exit());
@@ -60,9 +61,12 @@ public class Shell {
         );
         commands.put("history", (arguments, inputStream, outputStream, errorStream) ->
                 history.history(
-                        outputStream
+                        outputStream,
+                        historyHashMap
                 )
         );
+
+        int historyQuantity = 0;
 
         CommandCompletion commandCompletion = new CommandCompletion(commands.keySet(), directories);
         FileCompletion fileCompletion = new FileCompletion();
@@ -391,8 +395,6 @@ public class Shell {
                 continue;
             }
 
-
-
             String commandName = parsedCommand.getFirst();
 
             List<String> parsedArguments = parsedCommand.subList(
@@ -429,7 +431,7 @@ public class Shell {
                         errorStream.close();
                     }
                 }
-
+                historyHashMap.put(historyQuantity,command.trim());
                 continue;
             }
             // Search each PATH directory for an executable with this name.
@@ -446,6 +448,7 @@ public class Shell {
 
             if (processCommand.isEmpty()) {
                 System.out.println(commandName + ": command not found");
+                historyHashMap.put(historyQuantity,"invalid_command");
             } else {
 
                 ProcessBuilder pb = new ProcessBuilder(processCommand);
@@ -469,6 +472,7 @@ public class Shell {
                             "[" + jobId + "] " + process.pid()
                     );
                 } else {
+                    historyHashMap.put(historyQuantity,command.trim());
                     process.waitFor();
                 }
             }
