@@ -416,14 +416,22 @@ public class Shell {
 
                 String argument = parsedArguments.get(i);
 
-                Pattern pattern = Pattern.compile("\\$([a-zA-Z_][a-zA-Z0-9_]*)");
+                // Support both $VAR and ${VAR}
+                Pattern pattern = Pattern.compile(
+                        "\\$\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}|\\$([a-zA-Z_][a-zA-Z0-9_]*)"
+                );
+
                 Matcher matcher = pattern.matcher(argument);
 
                 String expandedArgument = matcher.replaceAll(match -> {
 
-                    String variableName = match.group(1);
+                    // ${VAR} uses group(1), $VAR uses group(2)
+                    String variableName = match.group(1) != null
+                            ? match.group(1)
+                            : match.group(2);
 
                     if (variablesMap.containsKey(variableName)) {
+
                         String variableValue = variablesMap.get(variableName);
 
                         return Matcher.quoteReplacement(variableValue);
