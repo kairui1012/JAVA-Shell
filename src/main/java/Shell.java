@@ -73,6 +73,7 @@ public class Shell {
                 "history",
                 (arguments, inputStream, outputStream, errorStream) ->
                         history.history(
+                                arguments,
                                 outputStream,
                                 historyHashMap
                         )
