@@ -1,4 +1,6 @@
+import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.file.Path;
 import java.util.ListIterator;
 
 public class History {
@@ -10,8 +12,23 @@ public class History {
         int start = lineHistory.first();
 
         if (!arguments.isBlank()) {
+
+            String[] parts = arguments.trim().split("\\s+", 2);
+
+            if (parts[0].equals("-r")) {
+                // parts[1] 就是文件路径
+                String filePath = parts[1];
+                try {
+                    lineHistory.read(Path.of(filePath), false);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+
             int limit = Integer.parseInt(arguments.trim());
             start = Math.max(lineHistory.first(), lineHistory.last() - limit + 1);
+
         }
 
         ListIterator<org.jline.reader.History.Entry> entries = lineHistory.iterator(start);
