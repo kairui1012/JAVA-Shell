@@ -16,10 +16,11 @@ import java.util.regex.Pattern;
 public class Shell {
 
     public void run() throws Exception {
-        // Split PATH into directories used to locate external programs.
+        // Read PATH once so external commands and completion candidates use the same search order.
         String systemPath = System.getenv("PATH");
         String[] directories = systemPath.split(Pattern.quote(File.pathSeparator));
 
+        // Create the services that implement the shell's built-in features.
         Navigation navigation = new Navigation();
         ProgrammableCompletion programmableCompletion = new ProgrammableCompletion();
         BackgroundJobs backgroundJobs = new BackgroundJobs();
@@ -27,13 +28,13 @@ public class Shell {
         History history = new History();
         org.jline.reader.History lineHistory = new DefaultHistory();
 
-        // Maps each target command to the external command that generates its completion candidates.
+        // Keep the command registry and the shared state used by completion and background jobs.
         HashMap<String, CommandHandler> commands = new HashMap<>();
         HashMap<String, String> completerCommandsByTarget = new HashMap<>();
         HashMap<Integer, Process> backgroundJobsMap = new HashMap<>();
         HashMap<Integer, String> backgroundCommandsMap = new HashMap<>();
 
-        // Register commands that are handled directly by this shell.
+        // Register commands that run inside this shell instead of starting an external process.
         commands.put("exit", (arguments, inputStream, outputStream, errorStream) -> exit());
         commands.put("echo", this::echo);
         commands.put(
@@ -84,14 +85,14 @@ public class Shell {
         CommandCompletion commandCompletion = new CommandCompletion(commands.keySet(), directories);
         FileCompletion fileCompletion = new FileCompletion();
 
-        // Build tab-completion candidates from shell built-ins and executable files in PATH.
+        // Build completion helpers from the registered built-ins and executable files in PATH.
         StringsCompleter stringsCompleter = commandCompletion.createCompleter();
 
-        // Keep backslashes in the input so the shell can apply its own escaping rules later.
+        // Preserve backslashes so Quoting can apply the shell's own escaping rules.
         DefaultParser parser = new DefaultParser();
         parser.setEscapeChars(null);
 
-        // Combine parsing and completion behavior, then attach the reader to the terminal.
+        // Configure JLine with parsing, completion, and the shared command history.
         LineReaderBuilder lineReaderBuilder = LineReaderBuilder.builder()
                 .parser(parser)
                 .completer(stringsCompleter)
@@ -99,10 +100,28 @@ public class Shell {
         Terminal terminal = TerminalBuilder.terminal();
         LineReader lineReader = lineReaderBuilder.terminal(terminal).build();
 
-        // Store the consecutive TAB count in an array so it can be updated inside the widget lambda.
+        String histFile = System.getenv("HISTFILE");
+
+        if (histFile != null && !histFile.isBlank()) {
+            Path path = Path.of(histFile);
+            if (Files.isRegularFile(path)){
+                try {
+                    List<String> lines = Files.readAllLines(path);
+
+                    for (String line : lines) {
+                        lineHistory.add(line);
+                    }
+
+                }catch (IOException e) {
+                    System.err.println("history: " + e.getMessage());
+                }
+            }
+        }
+
+        // Use an array so the widget lambda can update the consecutive TAB count.
         int[] tabCount = {0};
 
-        // Access JLine's widgets and key maps to register custom TAB behavior.
+        // Replace JLine's default TAB action with the shell's custom completion widget.
         Map<String, Widget> widgets = lineReader.getWidgets();
         Map<String, KeyMap<Binding>> keyMaps = lineReader.getKeyMaps();
 
@@ -118,25 +137,21 @@ public class Shell {
             String pathInput = "";
 
             if (!isPathCompletion) {
-                // =====================
-                // Command completion
-                // =====================
+                // Before the first space, complete built-ins and executable command names.
                 matches.addAll(commandsWithCustomCompleters);
                 matches.addAll(commandCompletion.findMatches(currentInput));
             } else {
-                // =====================
-                // Argument completion
-                // =====================
+                // After the first space, complete command arguments.
                 if (completerCommandsByTarget.keySet().stream()
                         .anyMatch(targetCommand -> currentInput.startsWith(targetCommand + " "))) {
 
-                    // Use the custom completer registered for this target command.
+                    // Use the programmable completer registered for the target command.
                     for (String targetCommand : completerCommandsByTarget.keySet()) {
                         if (currentInput.startsWith(targetCommand + " ")) {
-                            // STEP 1: Get the registered completer command for the current target command.
+                            // Resolve the external command that provides completion candidates.
                             String completerCommand = completerCommandsByTarget.get(targetCommand);
-                            // STEP 2: Start the completer command as a separate process.
 
+                            // Derive the command, current word, and previous word for the completer.
                             String[] strings = currentInput.split(" ");
                             String commandName = strings[0];
                             String currentWord = "";
@@ -170,6 +185,7 @@ public class Shell {
                                     previousWord
                             );
 
+                            // Provide the complete input line and byte cursor position to the completer.
                             Map<String, String> environment = completerProcessBuilder.environment();
                             environment.put("COMP_LINE", currentInput);
                             environment.put(
@@ -179,6 +195,7 @@ public class Shell {
                                     )
                             );
 
+                            // Run the completer as a separate process.
                             Process completerProcess;
                             try {
                                 completerProcess = completerProcessBuilder.start();
@@ -186,20 +203,19 @@ public class Shell {
                                 throw new RuntimeException(e);
                             }
 
-                            // STEP 3: Wait for the completer process to finish.
+                            // Wait until all completion candidates have been produced.
                             try {
                                 completerProcess.waitFor();
                             } catch (InterruptedException e) {
                                 throw new RuntimeException(e);
                             }
 
-                            // STEP 4: Read the completer process's standard output.
+                            // Treat each line from standard output as one completion candidate.
                             BufferedReader completerOutputReader = new BufferedReader(
                                     new InputStreamReader(completerProcess.getInputStream())
                             );
 
                             try {
-                                // STEP 5: Take the all output line as the completion candidate.
                                 String completionCandidate;
                                 while (
                                         (completionCandidate = completerOutputReader.readLine())
@@ -216,7 +232,7 @@ public class Shell {
                         }
                     }
                 } else {
-                    // Fall back to ordinary file and directory completion.
+                    // Commands without a programmable completer use file and directory completion.
                     FileCompletion.Result result = fileCompletion.findMatches(currentInput);
                     commandPart = result.commandPart();
                     pathInput = result.pathInput();
@@ -224,10 +240,7 @@ public class Shell {
                 }
             }
 
-            // =====================
-            // No match
-            // =====================
-
+            // Ring the terminal bell when no candidate matches the current input.
             if (matches.isEmpty()) {
                 terminal.writer().print("\u0007");
                 terminal.writer().flush();
@@ -236,10 +249,7 @@ public class Shell {
                 return true;
             }
 
-            // =====================
-            // One match
-            // =====================
-
+            // Insert a unique match immediately and add a trailing space for completed values.
             if (matches.size() == 1) {
                 String match = matches.getFirst();
 
@@ -262,11 +272,7 @@ public class Shell {
                 return true;
             }
 
-            // =====================
-            // Multiple matches
-            // Calculate Longest Common Prefix
-            // =====================
-
+            // Find the longest prefix shared by every remaining candidate.
             String lcp = matches.getFirst();
 
             for (String match : matches) {
@@ -281,10 +287,7 @@ public class Shell {
                 lcp = lcp.substring(0, i);
             }
 
-            // =====================
-            // Extend to LCP
-            // =====================
-
+            // Extend the current word when the shared prefix contains more characters.
             String currentCompletionInput;
 
             if (isPathCompletion) {
@@ -309,11 +312,7 @@ public class Shell {
                 return true;
             }
 
-            // =====================
-            // First TAB: bell
-            // Second TAB: show all matches
-            // =====================
-
+            // If no extension is possible, ring once and show all candidates on the next TAB.
             if (tabCount[0] == 0) {
                 terminal.writer().print("\u0007");
                 terminal.writer().flush();
@@ -337,26 +336,14 @@ public class Shell {
             return true;
         });
 
-        // Bind the custom widget to the TAB key in JLine's main key map.
+        // Bind the custom completion widget to TAB in JLine's main key map.
         KeyMap<Binding> mainKeyMap = keyMaps.get(LineReader.MAIN);
         Binding binding = new Reference("my-tab");
         mainKeyMap.bind(binding, "\t");
 
-        //        lineReader.printAbove
-        //        ("""
-        //           \s
-        //            ╦╔═╗╦  ╦╔═╗  ╔═╗╦ ╦╔═╗╦  ╦
-        //            ║╠═╣╚╗╔╝╠═╣  ╚═╗╠═╣║╣ ║  ║
-        //           ╚╝╩ ╩ ╚╝ ╩ ╩  ╚═╝╩ ╩╚═╝╩═╝╩═╝
-        //
-        //           Java Shell
-        //           Built from scratch by Sam
-        //
-        //           GitHub: github.com/kairui1012
-        //          \s
-        //       \s""");
-
+        // Read and execute commands until a built-in handler requests termination.
         while (true) {
+            // Report completed background processes before displaying the next prompt.
             backgroundJobs.reapFinishedJobs(
                     System.out,
                     backgroundJobsMap,
@@ -367,8 +354,10 @@ public class Shell {
 
             String command = lineReader.readLine("$ ");
 
+            // A trailing ampersand requests background execution for an external command.
             boolean isBackground = command.trim().endsWith("&");
 
+            // Pipelines manage their own parsing, processes, and stream connections.
             if (pipelines.isPipeline(command)) {
                 pipelines.execute(
                         command,
@@ -380,12 +369,13 @@ public class Shell {
                 continue;
             }
 
+            // Remove the background marker before tokenizing the command.
             if (isBackground) {
                 command = command.trim();
                 command = command.substring(0, command.length() - 1).trim();
             }
 
-            // Split the input while preserving quoted arguments.
+            // Tokenize the input while preserving quoted arguments and recording redirections.
             List<String> parsedCommand = Quoting.parse(command, redirection);
 
             if (parsedCommand.isEmpty()) {
@@ -403,7 +393,7 @@ public class Shell {
 
             List<String> processCommand = new ArrayList<>();
 
-            // A handler returns true to continue the shell and false to exit.
+            // Built-ins run in the shell process and receive redirected output streams directly.
             CommandHandler handler = commands.get(commandName);
 
             if (handler != null) {
@@ -435,7 +425,7 @@ public class Shell {
                 continue;
             }
 
-            // Search each PATH directory for an executable with this name.
+            // Resolve external commands by searching executable files in PATH order.
             for (String directory : directories) {
                 Path candidate = Path.of(directory, commandName);
 
@@ -450,6 +440,7 @@ public class Shell {
             if (processCommand.isEmpty()) {
                 System.out.println(commandName + ": command not found");
             } else {
+                // External commands inherit the terminal unless redirection overrides a stream.
                 ProcessBuilder pb = new ProcessBuilder(processCommand);
 
                 pb.inheritIO();
@@ -458,6 +449,7 @@ public class Shell {
                 Process process = pb.start();
 
                 if (isBackground) {
+                    // Track background processes under the lowest available positive job ID.
                     int jobId = 1;
 
                     while (backgroundJobsMap.containsKey(jobId)) {
@@ -469,16 +461,19 @@ public class Shell {
 
                     System.out.println("[" + jobId + "] " + process.pid());
                 } else {
+                    // Keep the prompt blocked until a foreground process exits.
                     process.waitFor();
                 }
             }
         }
     }
 
+    // Tell the main loop to terminate after the exit built-in runs.
     private boolean exit() {
         return false;
     }
 
+    // Write the supplied arguments exactly once to the selected output stream.
     private boolean echo(
             String arguments,
             InputStream inputStream,
@@ -489,6 +484,7 @@ public class Shell {
         return true;
     }
 
+    // Report whether a command is a shell built-in or an executable found through PATH.
     private boolean type(
             String arguments,
             HashMap<String, CommandHandler> commands,
