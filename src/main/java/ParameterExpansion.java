@@ -1,4 +1,6 @@
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class ParameterExpansion {
@@ -9,6 +11,7 @@ public class ParameterExpansion {
             PrintStream errorStream,
             Map<String, String> variables
     ) {
+
         String[] parts = arguments.trim().split("\\s+", 2);
 
         if (parts[0].equals("-p")) {
@@ -32,6 +35,20 @@ public class ParameterExpansion {
                             variables.get(variableName) + "\""
             );
         }
+        else if (arguments.contains("=")) {
+
+            List<String> leftVariable = new ArrayList<>();
+            List<String> rightValue = new ArrayList<>();
+
+            // Split at the first '='
+            String[] assignment = arguments.split("=", 2);
+
+            leftVariable.add(assignment[0].trim());
+            rightValue.add(assignment[1]);
+
+            variables.put(leftVariable.getFirst(), rightValue.getFirst());
+        }
+
 
         return true;
     }
