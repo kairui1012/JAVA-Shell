@@ -100,6 +100,11 @@ public class Shell {
         Terminal terminal = TerminalBuilder.terminal();
         LineReader lineReader = lineReaderBuilder.terminal(terminal).build();
 
+        lineReader.option(
+                LineReader.Option.HISTORY_IGNORE_DUPS,
+                false
+        );
+
         String histFile = System.getenv("HISTFILE");
 
         if (histFile != null && !histFile.isBlank()) {
