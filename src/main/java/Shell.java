@@ -15,20 +15,15 @@ import java.util.regex.Pattern;
 public class Shell {
 
     public void run() throws Exception {
-
         // Split PATH into directories used to locate external programs.
         String systemPath = System.getenv("PATH");
-        String[] directories = systemPath.split(
-                Pattern.quote(File.pathSeparator)
-        );
-
+        String[] directories = systemPath.split(Pattern.quote(File.pathSeparator));
 
         Navigation navigation = new Navigation();
         ProgrammableCompletion programmableCompletion = new ProgrammableCompletion();
         BackgroundJobs backgroundJobs = new BackgroundJobs();
         Pipelines pipelines = new Pipelines();
         History history = new History();
-
 
         // Maps each target command to the external command that generates its completion candidates.
         HashMap<String, CommandHandler> commands = new HashMap<>();
@@ -40,30 +35,47 @@ public class Shell {
         // Register commands that are handled directly by this shell.
         commands.put("exit", (arguments, inputStream, outputStream, errorStream) -> exit());
         commands.put("echo", this::echo);
-        commands.put("type", (arguments, inputStream, outputStream, errorStream) ->
-                type(arguments, commands, directories, outputStream));
-        commands.put("pwd", (arguments, inputStream, outputStream, errorStream) -> navigation.pwd(outputStream));
-        commands.put("cd", (arguments, inputStream, outputStream, errorStream) -> navigation.cd(arguments));
-        commands.put("complete", (arguments, inputStream, outputStream, errorStream) ->
-                programmableCompletion.complete(
-                        arguments,
-                        outputStream,
-                        errorStream,
-                        completerCommandsByTarget
-                )
+        commands.put(
+                "type",
+                (arguments, inputStream, outputStream, errorStream) ->
+                        type(arguments, commands, directories, outputStream)
         );
-        commands.put("jobs", (arguments, inputStream, outputStream, errorStream) ->
-                backgroundJobs.jobs(
-                        outputStream,
-                        backgroundJobsMap,
-                        backgroundCommandsMap
-                )
+        commands.put(
+                "pwd",
+                (arguments, inputStream, outputStream, errorStream) ->
+                        navigation.pwd(outputStream)
         );
-        commands.put("history", (arguments, inputStream, outputStream, errorStream) ->
-                history.history(
-                        outputStream,
-                        historyHashMap
-                )
+        commands.put(
+                "cd",
+                (arguments, inputStream, outputStream, errorStream) ->
+                        navigation.cd(arguments)
+        );
+        commands.put(
+                "complete",
+                (arguments, inputStream, outputStream, errorStream) ->
+                        programmableCompletion.complete(
+                                arguments,
+                                outputStream,
+                                errorStream,
+                                completerCommandsByTarget
+                        )
+        );
+        commands.put(
+                "jobs",
+                (arguments, inputStream, outputStream, errorStream) ->
+                        backgroundJobs.jobs(
+                                outputStream,
+                                backgroundJobsMap,
+                                backgroundCommandsMap
+                        )
+        );
+        commands.put(
+                "history",
+                (arguments, inputStream, outputStream, errorStream) ->
+                        history.history(
+                                outputStream,
+                                historyHashMap
+                        )
         );
 
         int historyQuantity = 0;
@@ -79,7 +91,9 @@ public class Shell {
         parser.setEscapeChars(null);
 
         // Combine parsing and completion behavior, then attach the reader to the terminal.
-        LineReaderBuilder lineReaderBuilder = LineReaderBuilder.builder().parser(parser).completer(stringsCompleter);
+        LineReaderBuilder lineReaderBuilder = LineReaderBuilder.builder()
+                .parser(parser)
+                .completer(stringsCompleter);
         Terminal terminal = TerminalBuilder.terminal();
         LineReader lineReader = lineReaderBuilder.terminal(terminal).build();
 
@@ -91,7 +105,6 @@ public class Shell {
         Map<String, KeyMap<Binding>> keyMaps = lineReader.getKeyMaps();
 
         widgets.put("my-tab", () -> {
-
             String currentInput = lineReader.getBuffer().toString();
             List<String> matches = new ArrayList<>();
             List<String> commandsWithCustomCompleters =
@@ -103,27 +116,20 @@ public class Shell {
             String pathInput = "";
 
             if (!isPathCompletion) {
-
                 // =====================
                 // Command completion
                 // =====================
-
                 matches.addAll(commandsWithCustomCompleters);
                 matches.addAll(commandCompletion.findMatches(currentInput));
-
             } else {
-
                 // =====================
                 // Argument completion
                 // =====================
-
-                if (completerCommandsByTarget.keySet()
-                        .stream()
+                if (completerCommandsByTarget.keySet().stream()
                         .anyMatch(targetCommand -> currentInput.startsWith(targetCommand + " "))) {
 
                     // Use the custom completer registered for this target command.
                     for (String targetCommand : completerCommandsByTarget.keySet()) {
-
                         if (currentInput.startsWith(targetCommand + " ")) {
                             // STEP 1: Get the registered completer command for the current target command.
                             String completerCommand = completerCommandsByTarget.get(targetCommand);
@@ -135,15 +141,12 @@ public class Shell {
                             String previousWord = "";
 
                             if (currentInput.endsWith(" ")) {
-
                                 if (strings.length > 1) {
                                     previousWord = strings[strings.length - 1];
                                 }
 
                                 commandPart = currentInput;
-
                             } else {
-
                                 if (strings.length > 2) {
                                     previousWord = strings[strings.length - 2];
                                     currentWord = strings[strings.length - 1];
@@ -167,7 +170,12 @@ public class Shell {
 
                             Map<String, String> environment = completerProcessBuilder.environment();
                             environment.put("COMP_LINE", currentInput);
-                            environment.put("COMP_POINT", String.valueOf(currentInput.getBytes(StandardCharsets.UTF_8).length));
+                            environment.put(
+                                    "COMP_POINT",
+                                    String.valueOf(
+                                            currentInput.getBytes(StandardCharsets.UTF_8).length
+                                    )
+                            );
 
                             Process completerProcess;
                             try {
@@ -189,20 +197,20 @@ public class Shell {
                             );
 
                             try {
-
                                 // STEP 5: Take the all output line as the completion candidate.
                                 String completionCandidate;
-                                while ((completionCandidate = completerOutputReader.readLine()) != null) {
+                                while (
+                                        (completionCandidate = completerOutputReader.readLine())
+                                                != null
+                                ) {
                                     matches.add(completionCandidate);
                                 }
-
                             } catch (IOException e) {
                                 terminal.writer().print("\u0007");
                                 terminal.writer().flush();
                             }
 
                             pathInput = currentWord;
-
                         }
                     }
                 } else {
@@ -231,19 +239,16 @@ public class Shell {
             // =====================
 
             if (matches.size() == 1) {
-
                 String match = matches.getFirst();
 
                 lineReader.getBuffer().clear();
 
                 if (isPathCompletion) {
-
                     if (match.endsWith("/")) {
                         lineReader.getBuffer().write(commandPart + match);
                     } else {
                         lineReader.getBuffer().write(commandPart + match + " ");
                     }
-
                 } else {
                     lineReader.getBuffer().write(match + " ");
                 }
@@ -263,14 +268,11 @@ public class Shell {
             String lcp = matches.getFirst();
 
             for (String match : matches) {
-
                 int i = 0;
 
-                while (
-                        i < lcp.length()
-                                && i < match.length()
-                                && lcp.charAt(i) == match.charAt(i)
-                ) {
+                while (i < lcp.length()
+                        && i < match.length()
+                        && lcp.charAt(i) == match.charAt(i)) {
                     i++;
                 }
 
@@ -290,7 +292,6 @@ public class Shell {
             }
 
             if (lcp.length() > currentCompletionInput.length()) {
-
                 lineReader.getBuffer().clear();
 
                 if (isPathCompletion) {
@@ -312,18 +313,14 @@ public class Shell {
             // =====================
 
             if (tabCount[0] == 0) {
-
                 terminal.writer().print("\u0007");
                 terminal.writer().flush();
 
                 tabCount[0] = 1;
-
             } else {
-
                 matches.sort(String::compareTo);
 
-                String combineMatchesResult =
-                        String.join("  ", matches);
+                String combineMatchesResult = String.join("  ", matches);
 
                 terminal.writer().println();
                 terminal.writer().println(combineMatchesResult);
@@ -343,7 +340,6 @@ public class Shell {
         Binding binding = new Reference("my-tab");
         mainKeyMap.bind(binding, "\t");
 
-
         //        lineReader.printAbove
         //        ("""
         //           \s
@@ -358,9 +354,7 @@ public class Shell {
         //          \s
         //       \s""");
 
-
         while (true) {
-
             backgroundJobs.reapFinishedJobs(
                     System.out,
                     backgroundJobsMap,
@@ -370,8 +364,10 @@ public class Shell {
             Redirection redirection = new Redirection();
 
             String command = lineReader.readLine("$ ");
+            historyQuantity = historyQuantity + 1;
 
             boolean isBackground = command.trim().endsWith("&");
+
             if (pipelines.isPipeline(command)) {
                 pipelines.execute(
                         command,
@@ -406,23 +402,27 @@ public class Shell {
 
             List<String> processCommand = new ArrayList<>();
 
-
             // A handler returns true to continue the shell and false to exit.
             CommandHandler handler = commands.get(commandName);
 
             if (handler != null) {
+                historyHashMap.put(historyQuantity, command.trim());
                 PrintStream outputStream = System.out;
                 PrintStream errorStream = System.err;
+
                 try {
                     outputStream = redirection.openOutputStream(System.out);
                     errorStream = redirection.openErrorStream(System.err);
 
-                    if (!handler.execute(parsedArgumentLine, System.in, outputStream, errorStream)) {
+                    if (!handler.execute(
+                            parsedArgumentLine,
+                            System.in,
+                            outputStream,
+                            errorStream
+                    )) {
                         break;
                     }
-
                 } finally {
-
                     if (outputStream != System.out) {
                         outputStream.close();
                     }
@@ -431,9 +431,10 @@ public class Shell {
                         errorStream.close();
                     }
                 }
-                historyHashMap.put(historyQuantity,command.trim());
+
                 continue;
             }
+
             // Search each PATH directory for an executable with this name.
             for (String directory : directories) {
                 Path candidate = Path.of(directory, commandName);
@@ -448,9 +449,8 @@ public class Shell {
 
             if (processCommand.isEmpty()) {
                 System.out.println(commandName + ": command not found");
-                historyHashMap.put(historyQuantity,"invalid_command");
+                historyHashMap.put(historyQuantity, "invalid_command");
             } else {
-
                 ProcessBuilder pb = new ProcessBuilder(processCommand);
 
                 pb.inheritIO();
@@ -468,18 +468,14 @@ public class Shell {
                     backgroundJobsMap.put(jobId, process);
                     backgroundCommandsMap.put(jobId, command);
 
-                    System.out.println(
-                            "[" + jobId + "] " + process.pid()
-                    );
+                    System.out.println("[" + jobId + "] " + process.pid());
                 } else {
-                    historyHashMap.put(historyQuantity,command.trim());
+                    historyHashMap.put(historyQuantity, command.trim());
                     process.waitFor();
                 }
             }
         }
     }
-
-
 
     private boolean exit() {
         return false;
@@ -512,8 +508,7 @@ public class Shell {
             for (String directory : directories) {
                 Path candidate = Path.of(directory, target);
 
-                if (Files.isRegularFile(candidate)
-                        && Files.isExecutable(candidate)) {
+                if (Files.isRegularFile(candidate) && Files.isExecutable(candidate)) {
                     outputStream.println(target + " is " + candidate);
                     found = true;
                     break;
@@ -527,5 +522,4 @@ public class Shell {
 
         return true;
     }
-
 }
