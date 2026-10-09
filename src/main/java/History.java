@@ -30,9 +30,11 @@ public class History {
                 for (String line : lines) {
                     lineHistory.add(line);
                 }
-            }
-            else if (parts[0].equals("-r")){
+                return true;
 
+            }
+            else if (parts[0].equals("-w")){
+                return true;
             }
 
 
