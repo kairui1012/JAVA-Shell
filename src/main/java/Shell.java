@@ -411,6 +411,23 @@ public class Shell {
 
             String parsedArgumentLine = String.join(" ", parsedArguments);
 
+            for (int i = 0; i < parsedArguments.size(); i++) {
+
+                String argument = parsedArguments.get(i);
+
+                if (argument.startsWith("$")) {
+
+                    String variableName = argument.substring(1);
+
+                    if (variablesMap.containsKey(variableName)) {
+
+                        String variableValue = variablesMap.get(variableName);
+
+                        parsedArguments.set(i, variableValue);
+                    }
+                }
+            }
+
             List<String> processCommand = new ArrayList<>();
 
             // Built-ins run in the shell process and receive redirected output streams directly.
