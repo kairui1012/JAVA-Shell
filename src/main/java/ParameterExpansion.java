@@ -1,17 +1,38 @@
 import java.io.PrintStream;
+import java.util.Map;
 
 public class ParameterExpansion {
 
-    public static boolean declare(String arguments, PrintStream outputStream, PrintStream errorStream) {
+    public static boolean declare(
+            String arguments,
+            PrintStream outputStream,
+            PrintStream errorStream,
+            Map<String, String> variables
+    ) {
         String[] parts = arguments.trim().split("\\s+", 2);
 
-        boolean found = false;
-        String option = parts[0];
-        if (option.equals("-p")){
-            if (!found){
-                outputStream.println("declare: "+parts[1]+": not found");
+        if (parts[0].equals("-p")) {
+
+            if (parts.length < 2 || parts[1].isBlank()) {
+                errorStream.println("declare: missing variable name");
+                return true;
             }
+
+            String variableName = parts[1].trim();
+
+            if (!variables.containsKey(variableName)) {
+                errorStream.println(
+                        "declare: " + variableName + ": not found"
+                );
+                return true;
+            }
+
+            outputStream.println(
+                    "declare -- " + variableName + "=\"" +
+                            variables.get(variableName) + "\""
+            );
         }
+
         return true;
     }
 }

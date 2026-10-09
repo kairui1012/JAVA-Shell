@@ -33,6 +33,8 @@ public class Shell {
         HashMap<String, String> completerCommandsByTarget = new HashMap<>();
         HashMap<Integer, Process> backgroundJobsMap = new HashMap<>();
         HashMap<Integer, String> backgroundCommandsMap = new HashMap<>();
+        HashMap<String, String> variablesMap = new HashMap<>();
+
 
         // Register commands that run inside this shell instead of starting an external process.
         commands.put("exit", (arguments, inputStream, outputStream, errorStream) ->
@@ -89,7 +91,8 @@ public class Shell {
                         ParameterExpansion.declare(
                                 arguments,
                                 outputStream,
-                                errorStream
+                                errorStream,
+                                variablesMap
                         )
         );
 
