@@ -13,91 +13,142 @@ public class History {
     public boolean history(
             String arguments,
             PrintStream outputStream,
-            PrintStream errorStream, org.jline.reader.History lineHistory
+            PrintStream errorStream,
+            org.jline.reader.History lineHistory
     ) {
+
         int start = lineHistory.first();
 
         if (!arguments.isBlank()) {
 
             String[] parts = arguments.trim().split("\\s+", 2);
 
-            // parts[1] 就是文件路径
-            if (parts.length < 2 || parts[1].isBlank()) {
-                errorStream.println("history: missing file path");
-                return true;
-            }
+            String option = parts[0];
 
-            String filePath = parts[1];
+            // Handle file operations: -r, -w, -a
+            if (option.equals("-r")
+                    || option.equals("-w")
+                    || option.equals("-a")) {
 
-            if (parts[0].equals("-r")) {
-
-                List<String> lines = null;
-                try {
-                    lines = Files.readAllLines(Path.of(filePath));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+                // Check whether a file path was provided
+                if (parts.length < 2 || parts[1].isBlank()) {
+                    errorStream.println("history: missing file path");
+                    return true;
                 }
 
-                for (String line : lines) {
-                    lineHistory.add(line);
+                String filePath = parts[1];
+                Path path = Path.of(filePath);
+
+                // ==========================
+                // Read history from file
+                // ==========================
+                if (option.equals("-r")) {
+
+                    try {
+                        List<String> lines = Files.readAllLines(path);
+
+                        for (String line : lines) {
+                            lineHistory.add(line);
+                        }
+
+                    } catch (IOException e) {
+                        errorStream.println("history: " + e.getMessage());
+                    }
+
+                    return true;
                 }
-                return true;
 
-            }
-            else if (parts[0].equals("-w")){
-                StringBuilder content = new StringBuilder();
+                // ==========================
+                // Write history to file
+                // ==========================
+                else if (option.equals("-w")) {
 
-                for (org.jline.reader.History.Entry entry : lineHistory) {
-                    content.append(entry.line()).append("\n");
-                }
+                    StringBuilder content = new StringBuilder();
 
-                try {
-                    Files.writeString(Path.of(filePath), content.toString());
-                } catch (IOException e) {
-                    errorStream.println("history: " + e.getMessage());
-                }
-                return true;
-            }
-
-            else if (parts[0].equals("-a")) {
-
-                StringBuilder content = new StringBuilder();
-
-                for (org.jline.reader.History.Entry entry : lineHistory) {
-                    if (entry.index() > lastAppendedIndex) {
+                    for (org.jline.reader.History.Entry entry : lineHistory) {
                         content.append(entry.line()).append("\n");
                     }
+
+                    try {
+                        Files.writeString(path, content.toString());
+
+                    } catch (IOException e) {
+                        errorStream.println("history: " + e.getMessage());
+                    }
+
+                    return true;
                 }
 
-                try {
-                    Files.writeString(
-                            Path.of(filePath),
-                            content.toString(),
-                            StandardOpenOption.CREATE,
-                            StandardOpenOption.APPEND
-                    );
+                // ==========================
+                // Append new history to file
+                // ==========================
+                else if (option.equals("-a")) {
 
-                    lastAppendedIndex = lineHistory.last();
+                    StringBuilder content = new StringBuilder();
 
-                } catch (IOException e) {
-                    errorStream.println("history: " + e.getMessage());
+                    for (org.jline.reader.History.Entry entry : lineHistory) {
+
+                        if (entry.index() > lastAppendedIndex) {
+                            content.append(entry.line()).append("\n");
+                        }
+                    }
+
+                    try {
+                        Files.writeString(
+                                path,
+                                content.toString(),
+                                StandardOpenOption.CREATE,
+                                StandardOpenOption.APPEND
+                        );
+
+                        // Update only after successful write
+                        lastAppendedIndex = lineHistory.last();
+
+                    } catch (IOException e) {
+                        errorStream.println("history: " + e.getMessage());
+                    }
+
+                    return true;
                 }
-
-                return true;
             }
 
+            // ==========================
+            // History with numeric limit
+            // ==========================
+            try {
 
+                int limit = Integer.parseInt(arguments.trim());
 
-            int limit = Integer.parseInt(arguments.trim());
-            start = Math.max(lineHistory.first(), lineHistory.last() - limit + 1);
+                if (limit <= 0) {
+                    return true;
+                }
 
+                start = Math.max(
+                        lineHistory.first(),
+                        lineHistory.last() - limit + 1
+                );
+
+            } catch (NumberFormatException e) {
+                errorStream.println("history: numeric argument required");
+                return true;
+            }
         }
 
-        ListIterator<org.jline.reader.History.Entry> entries = lineHistory.iterator(start);
+        // ==========================
+        // Display history
+        // ==========================
+        ListIterator<org.jline.reader.History.Entry> entries =
+                lineHistory.iterator(start);
 
         while (entries.hasNext()) {
+
             org.jline.reader.History.Entry entry = entries.next();
-            outputStream.printf("%5d  %s%n", entry.index() + 1, entry.line());
+
+            outputStream.printf(
+                    "%5d  %s%n",
+                    entry.index() + 1,
+                    entry.line()
+            );
         }
 
         return true;
