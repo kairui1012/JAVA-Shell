@@ -2,10 +2,14 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.ListIterator;
 
 public class History {
+
+    private int lastAppendedIndex = -1;
+
     public boolean history(
             String arguments,
             PrintStream outputStream,
@@ -48,12 +52,40 @@ public class History {
                 }
 
                 try {
-                     Files.writeString(Path.of(filePath),lineHistory.toString());
+                    Files.writeString(Path.of(filePath), content.toString());
                 } catch (IOException e) {
                     errorStream.println("history: " + e.getMessage());
                 }
                 return true;
             }
+
+            else if (parts[0].equals("-a")) {
+
+                StringBuilder content = new StringBuilder();
+
+                for (org.jline.reader.History.Entry entry : lineHistory) {
+                    if (entry.index() > lastAppendedIndex) {
+                        content.append(entry.line()).append("\n");
+                    }
+                }
+
+                try {
+                    Files.writeString(
+                            Path.of(filePath),
+                            content.toString(),
+                            StandardOpenOption.CREATE,
+                            StandardOpenOption.APPEND
+                    );
+
+                    lastAppendedIndex = lineHistory.last();
+
+                } catch (IOException e) {
+                    errorStream.println("history: " + e.getMessage());
+                }
+
+                return true;
+            }
+
 
 
             int limit = Integer.parseInt(arguments.trim());
