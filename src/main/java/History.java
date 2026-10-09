@@ -9,7 +9,7 @@ public class History {
     public boolean history(
             String arguments,
             PrintStream outputStream,
-            org.jline.reader.History lineHistory
+            PrintStream errorStream, org.jline.reader.History lineHistory
     ) {
         int start = lineHistory.first();
 
@@ -17,9 +17,16 @@ public class History {
 
             String[] parts = arguments.trim().split("\\s+", 2);
 
+            // parts[1] 就是文件路径
+            if (parts.length < 2 || parts[1].isBlank()) {
+                errorStream.println("history: missing file path");
+                return true;
+            }
+
+            String filePath = parts[1];
+
             if (parts[0].equals("-r")) {
-                // parts[1] 就是文件路径
-                String filePath = parts[1];
+
                 List<String> lines = null;
                 try {
                     lines = Files.readAllLines(Path.of(filePath));
@@ -34,6 +41,17 @@ public class History {
 
             }
             else if (parts[0].equals("-w")){
+                StringBuilder content = new StringBuilder();
+
+                for (org.jline.reader.History.Entry entry : lineHistory) {
+                    content.append(entry.line()).append("\n");
+                }
+
+                try {
+                     Files.writeString(Path.of(filePath),lineHistory.toString());
+                } catch (IOException e) {
+                    errorStream.println("history: " + e.getMessage());
+                }
                 return true;
             }
 

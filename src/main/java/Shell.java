@@ -76,6 +76,7 @@ public class Shell {
                         history.history(
                                 arguments,
                                 outputStream,
+                                errorStream,
                                 lineHistory
                         )
         );
