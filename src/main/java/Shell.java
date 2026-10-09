@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Shell {
@@ -415,17 +416,23 @@ public class Shell {
 
                 String argument = parsedArguments.get(i);
 
-                if (argument.startsWith("$")) {
+                Pattern pattern = Pattern.compile("\\$([a-zA-Z_][a-zA-Z0-9_]*)");
+                Matcher matcher = pattern.matcher(argument);
 
-                    String variableName = argument.substring(1);
+                String expandedArgument = matcher.replaceAll(match -> {
+
+                    String variableName = match.group(1);
 
                     if (variablesMap.containsKey(variableName)) {
-
                         String variableValue = variablesMap.get(variableName);
 
-                        parsedArguments.set(i, variableValue);
+                        return Matcher.quoteReplacement(variableValue);
                     }
-                }
+
+                    return Matcher.quoteReplacement(match.group());
+                });
+
+                parsedArguments.set(i, expandedArgument);
             }
 
             List<String> processCommand = new ArrayList<>();
